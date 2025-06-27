@@ -10,7 +10,7 @@ const ViewerControls = ({
     <div className="viewer-controls">
       <button
         className="control-btn new-btn"
-        // onClick={() => window.reload()}
+        onClick={() => window.location.reload()}
         title="New Project"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

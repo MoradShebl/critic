@@ -3,8 +3,6 @@ import React from "react";
 const SideMenu = ({
   isOpen,
   onClose,
-  wireframe,
-  setWireframe,
   bgColor,
   setBgColor,
   lightIntensity,
@@ -27,7 +25,6 @@ const SideMenu = ({
   onSaveProject,
   onLoadProject,
   onDeleteProject,
-  currentProject,
   quality,
   setQuality,
   enableShaders,
@@ -269,19 +266,6 @@ const SideMenu = ({
             </div>
 
             <div className="toggle-group">
-              <div className="toggle-item">
-                <input
-                  type="checkbox"
-                  id="wireframe"
-                  className="toggle-input"
-                  checked={wireframe}
-                  onChange={(e) => setWireframe(e.target.checked)}
-                />
-                <label htmlFor="wireframe" className="toggle-label">
-                  <span className="toggle-switch"></span>
-                  Wireframe Mode
-                </label>
-              </div>
 
               <div className="toggle-item">
                 <input

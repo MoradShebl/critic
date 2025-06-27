@@ -1,4 +1,11 @@
-import { useState, useEffect, useRef, Suspense } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  Suspense,
+  useMemo,
+  useCallback,
+} from "react";
 import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment, Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -14,46 +21,189 @@ import SideMenu from "./components/SideMenu";
 // Styles
 import "./styles/App.css";
 
-// Camera controller for orbit and walk mode
-function CameraController({ object, resetFlag, firstPerson }) {
+// Memoized loader instances for better performance
+const loaderInstances = {
+  fbx: new FBXLoader(),
+  obj: new OBJLoader(),
+  gltf: new GLTFLoader(),
+};
+
+// Configure loaders once
+loaderInstances.fbx.setResourcePath("./");
+
+// Camera controller for orbit and walk mode with smooth animation
+function CameraController({ object, resetFlag, firstPerson, animateOnLoad }) {
   const { camera, controls } = useThree();
+  const animationRef = useRef();
+  const targetPosition = useRef(new THREE.Vector3());
+  const targetLookAt = useRef(new THREE.Vector3());
+  const isAnimating = useRef(false);
+
   useEffect(() => {
     if (!object || firstPerson) return;
+
     const box = new THREE.Box3().setFromObject(object);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z);
-    const distance = maxDim * 1.5;
-    const angle = Math.PI / 6;
-    camera.position.set(
-      center.x + distance * Math.cos(angle),
-      center.y + distance * 0.5,
-      center.z + distance * Math.sin(angle)
-    );
-    camera.lookAt(center);
-    camera.near = maxDim / 1000;
-    camera.far = maxDim * 1000;
-    camera.updateProjectionMatrix();
-    if (controls) {
-      controls.target.copy(center);
-      controls.update();
-      controls.minDistance = 0;
-      controls.maxDistance = Infinity;
-      controls.minPolarAngle = 0;
-      controls.maxPolarAngle = Math.PI;
-      controls.enablePan = true;
+    const baseDistance = Math.max(2, maxDim * 1.7);
+    const height = Math.max(baseDistance * 0.45, size.y * 0.7);
+
+    if (animateOnLoad && !isAnimating.current) {
+      isAnimating.current = true;
+
+      // Enhanced animation with multiple phases
+      const totalDuration = 6000; // Increased total duration
+      const phase1Duration = 3000; // Orbit phase
+      const phase2Duration = 1500; // Zoom in phase
+      const phase3Duration = 1500; // Move to top view phase
+      
+      const startTime = performance.now();
+      const radiusStart = baseDistance * 3.5; // Start even farther
+      const radiusMiddle = baseDistance * 0.8; // Middle zoom position
+      const radiusEnd = baseDistance * 1.2; // Final top view distance
+      
+      // Initial positions
+      const orbitY = center.y + height;
+      const topViewY = center.y + maxDim * 2; // High above for top view
+      const lookAt = center.clone();
+      
+      targetLookAt.current.copy(lookAt);
+
+      const animate = () => {
+        const elapsed = performance.now() - startTime;
+        const totalProgress = Math.min(elapsed / totalDuration, 1);
+        
+        let camX, camY, camZ;
+        
+        if (elapsed < phase1Duration) {
+          // Phase 1: Orbital movement with zoom in
+          const t1 = elapsed / phase1Duration;
+          const ease1 = easeInOutCubic(t1);
+          
+          const angle = ease1 * Math.PI * 2.5; // More than full rotation
+          const radius = radiusStart + (radiusMiddle - radiusStart) * ease1;
+          const currentY = orbitY + Math.sin(t1 * Math.PI * 2) * (height * 0.2); // Slight vertical oscillation
+          
+          camX = center.x + radius * Math.cos(angle);
+          camZ = center.z + radius * Math.sin(angle);
+          camY = currentY;
+          
+        } else if (elapsed < phase1Duration + phase2Duration) {
+          // Phase 2: Continue orbit while getting closer and slightly higher
+          const t2 = (elapsed - phase1Duration) / phase2Duration;
+          const ease2 = easeInOutQuart(t2);
+          
+          const angle = 2.5 * Math.PI + ease2 * Math.PI * 0.8; // Continue rotating
+          const radius = radiusMiddle + (radiusEnd - radiusMiddle) * ease2;
+          const currentY = orbitY + (topViewY * 0.3 - orbitY) * ease2; // Start moving up
+          
+          camX = center.x + radius * Math.cos(angle);
+          camZ = center.z + radius * Math.sin(angle);
+          camY = currentY;
+          
+        } else {
+          // Phase 3: Transition to top view
+          const t3 = (elapsed - phase1Duration - phase2Duration) / phase3Duration;
+          const ease3 = easeOutQuart(t3);
+          
+          // Smoothly transition to directly above
+          const prevAngle = 2.5 * Math.PI + 0.8 * Math.PI;
+          const prevX = center.x + radiusEnd * Math.cos(prevAngle);
+          const prevZ = center.z + radiusEnd * Math.sin(prevAngle);
+          const prevY = orbitY + (topViewY * 0.3 - orbitY);
+          
+          camX = prevX + (center.x - prevX) * ease3;
+          camZ = prevZ + (center.z - prevZ) * ease3;
+          camY = prevY + (topViewY - prevY) * ease3;
+        }
+
+        targetPosition.current.set(camX, camY, camZ);
+        camera.position.copy(targetPosition.current);
+        camera.lookAt(targetLookAt.current);
+
+        if (controls) {
+          controls.target.copy(targetLookAt.current);
+          controls.update();
+        }
+
+        if (totalProgress < 1) {
+          animationRef.current = requestAnimationFrame(animate);
+        } else {
+          isAnimating.current = false;
+        }
+      };
+
+      animate();
+
+      if (controls) controls.enabled = false;
+      const enableControlsTimeout = setTimeout(() => {
+        if (controls) controls.enabled = true;
+      }, totalDuration + 100);
+
+      return () => {
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+        }
+        clearTimeout(enableControlsTimeout);
+        if (controls) controls.enabled = true;
+      };
+      
+    } else if (!animateOnLoad) {
+      // Static positioning when not animating
+      const angle = Math.PI / 5;
+      const newPosition = center
+        .clone()
+        .add(
+          new THREE.Vector3(
+            baseDistance * Math.cos(angle),
+            height,
+            baseDistance * Math.sin(angle)
+          )
+        );
+      targetPosition.current.copy(newPosition);
+      targetLookAt.current.copy(center);
+      camera.position.copy(targetPosition.current);
+      camera.lookAt(targetLookAt.current);
+      if (controls) {
+        controls.target.copy(targetLookAt.current);
+        controls.update();
+      }
     }
-  }, [object, camera, controls, resetFlag, firstPerson]);
+
+    camera.near = Math.max(0.01, maxDim / 1000);
+    camera.far = Math.max(1000, maxDim * 1000);
+    camera.updateProjectionMatrix();
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+      if (controls) controls.enabled = true;
+    };
+  }, [object, camera, controls, resetFlag, firstPerson, animateOnLoad]);
+
   return null;
 }
 
+// Enhanced easing functions for smoother animations
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function easeInOutQuart(t) {
+  return t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
+}
+
+function easeOutQuart(t) {
+  return 1 - Math.pow(1 - t, 4);
+}
 // Walk mode controller with mouse wheel speed adjustment
 function FirstPersonController({ enabled }) {
   const { camera, gl } = useThree();
   const velocity = useRef(new THREE.Vector3());
   const direction = useRef(new THREE.Vector3());
   const keys = useRef({});
-  // Lower walk/run speed defaults
   const [walkSpeed, setWalkSpeed] = useState(2);
   const [runSpeed, setRunSpeed] = useState(4);
   const state = useRef({
@@ -66,8 +216,12 @@ function FirstPersonController({ enabled }) {
   useEffect(() => {
     if (!enabled) return;
     const handleWheel = (e) => {
-      setWalkSpeed((prev) => Math.max(50, Math.min(2000, prev - e.deltaY * 2)));
-      setRunSpeed((prev) => Math.max(100, Math.min(4000, prev - e.deltaY * 4)));
+      setWalkSpeed((prev) =>
+        Math.max(0.01, Math.min(10, prev - e.deltaY * 0.01))
+      );
+      setRunSpeed((prev) =>
+        Math.max(0.02, Math.min(20, prev - e.deltaY * 0.02))
+      );
     };
     window.addEventListener("wheel", handleWheel, { passive: false });
     return () => window.removeEventListener("wheel", handleWheel);
@@ -151,7 +305,7 @@ function FirstPersonController({ enabled }) {
   return null;
 }
 
-// Model loader and viewer
+// Enhanced model loader with memoization and better performance
 function ModelViewer({
   file,
   wireframe,
@@ -159,19 +313,237 @@ function ModelViewer({
   setAnimations,
   animationIndex,
   setLoadingProgress,
+  onModelLoaded,
+  shadowQuality,
+  enableShaders,
+  showGround,
+  groundOpacity,
 }) {
   const [model, setModel] = useState(null);
   const [clock] = useState(() => new THREE.Clock());
   const [modelBounds, setModelBounds] = useState(null);
   const requestRef = useRef();
+  const loadingCache = useRef(new Map());
+  const [modelLights, setModelLights] = useState([]); // <-- Add state for lights
 
-  // Calculate model bounds for dynamic shadow plane sizing
-  const calculateModelBounds = (obj) => {
+  // Memoized material enhancement function
+  const applyEnhancedShadows = useCallback(
+    (obj) => {
+      obj.traverse((child) => {
+        if (child.isMesh && child.material) {
+          // Enable shadows
+          child.castShadow = true;
+          child.receiveShadow = true;
+
+          const materials = Array.isArray(child.material)
+            ? child.material
+            : [child.material];
+
+          materials.forEach((mat) => {
+            mat.wireframe = wireframe;
+
+            // Enhanced shadow properties
+            mat.shadowSide = THREE.DoubleSide;
+
+            // --- Preserve original opacity for transparent materials (e.g., glass) ---
+            if (
+              mat.transparent &&
+              typeof mat.opacity === "number" &&
+              mat.opacity < 1
+            ) {
+              mat.opacity = mat.opacity; // keep original
+              mat.transparent = true;
+              mat.depthWrite = false; // helps with correct blending for glass
+              mat.alphaTest = 0.01;
+              // Optionally, you can set mat.blending = THREE.NormalBlending;
+            }
+
+            // Improve material properties for better shadows
+            if (mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial) {
+              mat.roughness = mat.roughness !== undefined ? mat.roughness : 0.7;
+              mat.metalness = mat.metalness !== undefined ? mat.metalness : 0.1;
+
+              // Enhance shadow reception
+              if (enableShaders) {
+                mat.envMapIntensity = 0.8;
+              }
+            } else if (mat.isMeshLambertMaterial || mat.isMeshPhongMaterial) {
+              // Convert basic materials to standard for better shadows
+              const standardMat = new THREE.MeshStandardMaterial({
+                color: mat.color,
+                map: mat.map,
+                normalMap: mat.normalMap,
+                roughness: 0.7,
+                metalness: 0.1,
+                wireframe: wireframe,
+                shadowSide: THREE.DoubleSide,
+                transparent: mat.transparent,
+                opacity: mat.opacity,
+                depthWrite: mat.depthWrite,
+                alphaTest: mat.alphaTest,
+              });
+              child.material = standardMat;
+            }
+
+            mat.needsUpdate = true;
+          });
+
+          // Optimize geometry for shadows
+          if (child.geometry) {
+            if (!child.geometry.attributes.normal) {
+              child.geometry.computeVertexNormals();
+            }
+            child.geometry.computeBoundingSphere();
+            child.geometry.computeBoundingBox();
+          }
+        }
+      });
+    },
+    [wireframe, enableShaders]
+  );
+
+  // Memoized model info extraction
+  const extractInfo = useCallback((obj) => {
+    let meshCount = 0,
+      vertexCount = 0,
+      triangleCount = 0;
+    obj.traverse((child) => {
+      if (child.isMesh) {
+        meshCount++;
+        if (child.geometry) {
+          vertexCount += child.geometry.attributes.position?.count || 0;
+          triangleCount += child.geometry.index
+            ? child.geometry.index.count / 3
+            : (child.geometry.attributes.position?.count || 0) / 3;
+        }
+      }
+    });
+    return { meshCount, vertexCount, triangleCount };
+  }, []);
+
+  // Memoized bounds calculation
+  const calculateModelBounds = useCallback((obj) => {
     const box = new THREE.Box3().setFromObject(obj);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     return { box, size, center };
-  };
+  }, []);
+
+  // Optimized loading function with caching
+  const loadModelAsync = useCallback(async () => {
+    if (!file) return;
+
+    const fileKey = `${file.name}-${file.size}-${file.lastModified}`;
+
+    // Check cache first
+    if (loadingCache.current.has(fileKey)) {
+      const cachedModel = loadingCache.current.get(fileKey);
+      setModel(cachedModel.model);
+      setModelBounds(cachedModel.bounds);
+      setModelInfo(cachedModel.info);
+      setAnimations(cachedModel.animations);
+      setModelLights(cachedModel.lights || []); // <-- Restore cached lights
+      setLoadingProgress(100);
+      if (onModelLoaded) onModelLoaded();
+      return;
+    }
+
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    setLoadingProgress(10);
+
+    try {
+      let loadedModel = null;
+
+      if (ext === "fbx") {
+        const arrayBuffer = await file.arrayBuffer();
+        setLoadingProgress(30);
+        loadedModel = loaderInstances.fbx.parseAsync
+          ? await loaderInstances.fbx.parseAsync(arrayBuffer, "")
+          : loaderInstances.fbx.parse(arrayBuffer, "");
+      } else if (ext === "obj") {
+        const text = await file.text();
+        setLoadingProgress(30);
+        loadedModel = loaderInstances.obj.parse(text);
+      } else if (ext === "gltf" || ext === "glb") {
+        setLoadingProgress(20);
+        loaderInstances.gltf.manager.onProgress = (_, loaded, total) => {
+          const progress = Math.round((loaded / total) * 60) + 20; // 20-80%
+          setLoadingProgress(progress);
+        };
+
+        loadedModel = await new Promise((resolve, reject) => {
+          loaderInstances.gltf.load(
+            URL.createObjectURL(file),
+            (gltf) => resolve(gltf.scene),
+            undefined,
+            () => reject(new Error("Failed to load GLTF/GLB file"))
+          );
+        });
+      } else {
+        throw new Error("Unsupported file format");
+      }
+
+      if (loadedModel) {
+        setLoadingProgress(85);
+
+        // Apply enhancements
+        applyEnhancedShadows(loadedModel);
+
+        setLoadingProgress(95);
+
+        const bounds = calculateModelBounds(loadedModel);
+        const info = extractInfo(loadedModel);
+        const animations = loadedModel.animations || [];
+
+        // --- Collect lights from the model ---
+        const lights = [];
+        loadedModel.traverse((child) => {
+          if (child.isLight) {
+            lights.push(child);
+          }
+        });
+        setModelLights(lights);
+
+        // Cache the processed model and lights
+        loadingCache.current.set(fileKey, {
+          model: loadedModel,
+          bounds,
+          info,
+          animations,
+          lights,
+        });
+
+        // Limit cache size to prevent memory issues
+        if (loadingCache.current.size > 5) {
+          const firstKey = loadingCache.current.keys().next().value;
+          loadingCache.current.delete(firstKey);
+        }
+
+        setModel(loadedModel);
+        setModelBounds(bounds);
+        setModelInfo(info);
+        setAnimations(animations);
+        setLoadingProgress(100);
+
+        // Trigger camera animation
+        if (onModelLoaded) {
+          onModelLoaded();
+        }
+      }
+    } catch (error) {
+      setModelInfo({ error: error.message || "Failed to load model." });
+      setLoadingProgress(0);
+    }
+  }, [
+    file,
+    applyEnhancedShadows,
+    calculateModelBounds,
+    extractInfo,
+    setModelInfo,
+    setAnimations,
+    setLoadingProgress,
+    onModelLoaded,
+  ]);
 
   useEffect(() => {
     let isMounted = true;
@@ -181,126 +553,16 @@ function ModelViewer({
     setLoadingProgress(0);
     setModelBounds(null);
 
-    if (!file) return;
-
-    const ext = file.name.split(".").pop()?.toLowerCase();
-
-    async function loadModelAsync() {
-      // Enhanced shadow and wireframe application
-      function applyEnhancedShadows(obj) {
-        obj.traverse((child) => {
-          if (child.isMesh && child.material) {
-            child.castShadow = true;
-            child.receiveShadow = true;
-
-            const materials = Array.isArray(child.material)
-              ? child.material
-              : [child.material];
-            materials.forEach((mat) => {
-              mat.wireframe = wireframe;
-
-              // Enhanced shadow properties
-              mat.shadowSide = THREE.DoubleSide;
-
-              // Improve shadow quality for different material types
-              if (mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial) {
-                mat.roughness = mat.roughness || 0.5;
-                mat.metalness = mat.metalness || 0.0;
-              }
-
-              // Handle transparent materials
-              if (mat.transparent && mat.opacity < 1) {
-                mat.alphaTest = 0.1;
-              }
-
-              // Force material updates
-              mat.needsUpdate = true;
-            });
-
-            // Optimize geometry
-            if (child.geometry) {
-              if (!child.geometry.attributes.normal) {
-                child.geometry.computeVertexNormals();
-              }
-              child.geometry.computeBoundingSphere();
-              child.geometry.computeBoundingBox();
-            }
-          }
-        });
-      }
-
-      function extractInfo(obj) {
-        let meshCount = 0,
-          vertexCount = 0,
-          triangleCount = 0;
-        obj.traverse((child) => {
-          if (child.isMesh) {
-            meshCount++;
-            if (child.geometry) {
-              vertexCount += child.geometry.attributes.position?.count || 0;
-              triangleCount += child.geometry.index
-                ? child.geometry.index.count / 3
-                : (child.geometry.attributes.position?.count || 0) / 3;
-            }
-          }
-        });
-        return { meshCount, vertexCount, triangleCount };
-      }
-
-      try {
-        let loadedModel = null;
-
-        if (ext === "fbx") {
-          const arrayBuffer = await file.arrayBuffer();
-          const loader = new FBXLoader();
-          loader.setResourcePath("./");
-          loadedModel = loader.parseAsync
-            ? await loader.parseAsync(arrayBuffer, "")
-            : loader.parse(arrayBuffer, "");
-        } else if (ext === "obj") {
-          const text = await file.text();
-          const loader = new OBJLoader();
-          loadedModel = loader.parse(text);
-        } else if (ext === "gltf" || ext === "glb") {
-          const loader = new GLTFLoader();
-          loader.manager.onProgress = (_, loaded, total) =>
-            setLoadingProgress(Math.round((loaded / total) * 100));
-
-          loadedModel = await new Promise((resolve, reject) => {
-            loader.load(
-              URL.createObjectURL(file),
-              (gltf) => resolve(gltf.scene),
-              undefined,
-              () => reject(new Error("Failed to load GLTF/GLB file"))
-            );
-          });
-        } else {
-          throw new Error("Unsupported file format");
-        }
-
-        if (loadedModel && isMounted) {
-          applyEnhancedShadows(loadedModel);
-          const bounds = calculateModelBounds(loadedModel);
-
-          setModel(loadedModel);
-          setModelBounds(bounds);
-          setModelInfo(extractInfo(loadedModel));
-          setAnimations(loadedModel.animations || []);
-        }
-      } catch (error) {
-        if (isMounted) {
-          setModelInfo({ error: error.message || "Failed to load model." });
-        }
-      }
+    if (file && isMounted) {
+      loadModelAsync();
     }
 
-    loadModelAsync();
     return () => {
       isMounted = false;
     };
-  }, [file, wireframe, setModelInfo, setAnimations, setLoadingProgress]);
+  }, [file, loadModelAsync]);
 
-  // Animation handling
+  // Animation handling with memoization
   useEffect(() => {
     if (!model || !model.animations || model.animations.length === 0) return;
 
@@ -323,9 +585,15 @@ function ModelViewer({
     };
   }, [model, animationIndex, clock]);
 
-  useEffect(() => {
-    if (model) setLoadingProgress(100);
-  }, [model, setLoadingProgress]);
+  // Memoized shadow plane size calculation
+  const shadowPlaneConfig = useMemo(() => {
+    if (!modelBounds) return { size: 200, y: -0.01 };
+
+    return {
+      size: Math.max(modelBounds.size.x, modelBounds.size.z) * 4,
+      y: modelBounds.box.min.y - 0.01,
+    };
+  }, [modelBounds]);
 
   if (!model) {
     return (
@@ -389,7 +657,7 @@ function ModelViewer({
           >
             <div
               style={{
-                width: `${Math.max(5, window.loadingProgress || 0)}%`,
+                width: `${Math.max(5, loadingProgress || 0)}%`,
                 height: "100%",
                 background: "linear-gradient(90deg,#fff,#222 80%)",
                 borderRadius: 5,
@@ -401,9 +669,7 @@ function ModelViewer({
           <div
             style={{ fontSize: 16, color: "#fff", opacity: 0.85, marginTop: 2 }}
           >
-            {window.loadingProgress
-              ? `${window.loadingProgress}%`
-              : "Starting..."}
+            {loadingProgress ? `${loadingProgress}%` : "Starting..."}
           </div>
           <div
             style={{
@@ -425,114 +691,52 @@ function ModelViewer({
     );
   }
 
-  // Dynamic shadow plane based on model bounds
-  const shadowPlaneSize = modelBounds
-    ? Math.max(modelBounds.size.x, modelBounds.size.z) * 3
-    : 200;
-  const shadowPlaneY = modelBounds ? modelBounds.box.min.y - 0.01 : -0.01;
-
   return (
     <>
       <primitive object={model} />
+      {/* Render imported lights as primitives */}
+      {modelLights.map((light, idx) => (
+        <primitive object={light} key={light.uuid || idx} />
+      ))}
+      {/* Enhanced shadow catcher plane */}
+      {showGround && (
+        <>
+          <mesh
+            receiveShadow
+            position={[0, shadowPlaneConfig.y, 0]}
+            rotation={[-Math.PI / 2, 0, 0]}
+          >
+            <planeGeometry
+              args={[shadowPlaneConfig.size, shadowPlaneConfig.size]}
+            />
+            <shadowMaterial opacity={0.6} transparent={true} color="#000000" />
+          </mesh>
 
-      {/* Enhanced shadow catcher plane with dynamic sizing */}
-      <mesh
-        receiveShadow
-        position={[0, shadowPlaneY, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-      >
-        <planeGeometry args={[shadowPlaneSize, shadowPlaneSize]} />
-        <shadowMaterial opacity={0.4} transparent={true} color="#000000" />
-      </mesh>
-
-      {/* Optional: Add a subtle reflection plane for enhanced visual appeal */}
-      <mesh
-        receiveShadow
-        position={[0, shadowPlaneY - 0.001, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-      >
-        <planeGeometry args={[shadowPlaneSize, shadowPlaneSize]} />
-        <meshStandardMaterial
-          transparent={true}
-          opacity={0.1}
-          color="#ffffff"
-          roughness={0.1}
-          metalness={0.9}
-        />
-      </mesh>
+          {/* Reflective ground plane */}
+          <mesh
+            receiveShadow
+            position={[0, shadowPlaneConfig.y - 0.001, 0]}
+            rotation={[-Math.PI / 2, 0, 0]}
+          >
+            <planeGeometry
+              args={[shadowPlaneConfig.size, shadowPlaneConfig.size]}
+            />
+            <meshStandardMaterial
+              transparent={true}
+              opacity={groundOpacity}
+              color="#ffffff"
+              roughness={0.1}
+              metalness={0.9}
+            />
+          </mesh>
+        </>
+      )}
 
       <CameraController
         object={model}
         resetFlag={animationIndex}
         firstPerson={window.__firstPersonActive}
-      />
-    </>
-  );
-}
-
-function createEnhancedLighting(
-  lightIntensity,
-  lightColor,
-  ambientIntensity,
-  dirLight2Color,
-  dirLight2Pos
-) {
-  return (
-    <>
-      {/* Ambient light for overall illumination */}
-      <ambientLight intensity={ambientIntensity} color="#404040" />
-
-      {/* Main directional light with enhanced shadow settings */}
-      <directionalLight
-        position={[15, 25, 15]}
-        intensity={lightIntensity}
-        color={lightColor}
-        castShadow={true}
-        shadow-mapSize-width={4096} // Higher resolution shadows
-        shadow-mapSize-height={4096}
-        shadow-bias={-0.0005} // Reduced shadow acne
-        shadow-normalBias={0.02}
-        shadow-radius={10} // Softer shadows
-        shadow-camera-near={0.5}
-        shadow-camera-far={100}
-        shadow-camera-left={-50}
-        shadow-camera-right={50}
-        shadow-camera-top={50}
-        shadow-camera-bottom={-50}
-      />
-
-      {/* Secondary directional light for fill lighting */}
-      <directionalLight
-        position={dirLight2Pos}
-        intensity={lightIntensity * 0.3}
-        color={dirLight2Color}
-        castShadow={true}
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-bias={-0.001}
-        shadow-radius={6}
-        shadow-camera-near={1}
-        shadow-camera-far={50}
-        shadow-camera-left={-25}
-        shadow-camera-right={25}
-        shadow-camera-top={25}
-        shadow-camera-bottom={-25}
-      />
-
-      {/* Rim light for better model definition */}
-      <directionalLight
-        position={[-20, 15, -20]}
-        intensity={lightIntensity * 0.2}
-        color="#b3d9ff"
-        castShadow={false} // No shadows for rim light to avoid conflicts
-      />
-
-      {/* Subtle bottom light to reduce harsh shadows */}
-      <directionalLight
-        position={[0, -10, 0]}
-        intensity={lightIntensity * 0.1}
-        color="#ffffff"
-        castShadow={false}
+        animateOnLoad={window.__animateCamera}
       />
     </>
   );
@@ -557,7 +761,17 @@ function App() {
   const [dirLight2Color, setDirLight2Color] = useState("#ffffff");
   const [dirLight2Pos, setDirLight2Pos] = useState([-10, 10, -5]);
 
-  // Track loading progress globally for the loading bar in ModelViewer
+  // New state variables for enhanced controls
+  const [quality, setQuality] = useState("high");
+  const [enableShaders, setEnableShaders] = useState(true);
+  const [enableEffects, setEnableEffects] = useState(false);
+  const [showGround, setShowGround] = useState(true);
+  const [groundOpacity, setGroundOpacity] = useState(0.3);
+  const [shadowQuality, setShadowQuality] = useState("high");
+  const [antialiasing, setAntialiasing] = useState(true);
+  const [animateCamera, setAnimateCamera] = useState(false);
+
+  // Track loading progress globally
   useEffect(() => {
     window.loadingProgress = loadingProgress;
     return () => {
@@ -565,21 +779,74 @@ function App() {
     };
   }, [loadingProgress]);
 
-  const handleScreenshot = () => {
+  // Track first person mode globally
+  useEffect(() => {
+    window.__firstPersonActive = firstPerson;
+  }, [firstPerson]);
+
+  // Track camera animation flag globally
+  useEffect(() => {
+    window.__animateCamera = animateCamera;
+  }, [animateCamera]);
+
+  // Memoized screenshot handler
+  const handleScreenshot = useCallback(() => {
     const canvas = document.querySelector("canvas");
     if (!canvas) return;
-    const url = canvas.toDataURL("image/png");
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `property-screenshot-${new Date()
-      .toISOString()
-      .slice(0, 10)}.png`;
-    a.click();
-  };
 
-  const handleResetCamera = () => setResetCameraFlag((f) => !f);
-  const handleToggleFirstPerson = () => setFirstPerson((f) => !f);
-  const handleSaveProject = () => {
+    // Save original size and style
+    const originalWidth = canvas.width;
+    const originalHeight = canvas.height;
+    const originalStyle = {
+      width: canvas.style.width,
+      height: canvas.style.height,
+    };
+
+    // Set higher resolution for screenshot (e.g., 2x)
+    const scale = 1;
+    canvas.style.width = `${canvas.width}px`;
+    canvas.style.height = `${canvas.height}px`;
+    canvas.width = originalWidth * scale;
+    canvas.height = originalHeight * scale;
+
+    // Force re-render by dispatching a resize event
+    window.dispatchEvent(new Event("resize"));
+
+    setTimeout(() => {
+      try {
+        const url = canvas.toDataURL("image/png", 1.0);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `model-screenshot-${new Date()
+          .toISOString()
+          .slice(0, 10)}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } catch (e) {
+        alert("Screenshot failed. Try again.");
+      } finally {
+        // Restore original size and style
+        canvas.width = originalWidth;
+        canvas.height = originalHeight;
+        canvas.style.width = originalStyle.width;
+        canvas.style.height = originalStyle.height;
+        window.dispatchEvent(new Event("resize"));
+      }
+    }, 200); // Wait for re-render
+  }, []);
+
+  const handleResetCamera = useCallback(
+    () => setResetCameraFlag((f) => !f),
+    []
+  );
+
+  const handleToggleFirstPerson = useCallback(
+    () => setFirstPerson((f) => !f),
+    []
+  );
+
+  const handleSaveProject = useCallback(() => {
     if (!file) return;
     const project = {
       id: Date.now(),
@@ -591,28 +858,140 @@ function App() {
         lightIntensity,
         lightColor,
         animationIndex,
+        quality,
+        enableShaders,
+        enableEffects,
+        showGround,
+        groundOpacity,
+        shadowQuality,
+        antialiasing,
+        ambientIntensity,
+        dirLight2Color,
+        dirLight2Pos,
       },
       savedAt: new Date().toISOString(),
     };
     setProjects((prev) => [...prev, project]);
     setCurrentProject(project);
-  };
-  const handleLoadProject = (project) => {
+  }, [
+    file,
+    wireframe,
+    bgColor,
+    lightIntensity,
+    lightColor,
+    animationIndex,
+    quality,
+    enableShaders,
+    enableEffects,
+    showGround,
+    groundOpacity,
+    shadowQuality,
+    antialiasing,
+    ambientIntensity,
+    dirLight2Color,
+    dirLight2Pos,
+  ]);
+
+  const handleLoadProject = useCallback((project) => {
     setFile(project.file);
-    setWireframe(project.settings.wireframe);
-    setBgColor(project.settings.bgColor);
-    setLightIntensity(project.settings.lightIntensity);
-    setLightColor(project.settings.lightColor);
-    setAnimationIndex(project.settings.animationIndex);
+    const settings = project.settings;
+    setWireframe(settings.wireframe);
+    setBgColor(settings.bgColor);
+    setLightIntensity(settings.lightIntensity);
+    setLightColor(settings.lightColor);
+    setAnimationIndex(settings.animationIndex);
+    setQuality(settings.quality || "high");
+    setEnableShaders(
+      settings.enableShaders !== undefined ? settings.enableShaders : true
+    );
+    setEnableEffects(settings.enableEffects || false);
+    setShowGround(
+      settings.showGround !== undefined ? settings.showGround : true
+    );
+    setGroundOpacity(settings.groundOpacity || 0.3);
+    setShadowQuality(settings.shadowQuality || "high");
+    setAntialiasing(
+      settings.antialiasing !== undefined ? settings.antialiasing : true
+    );
+    setAmbientIntensity(settings.ambientIntensity || 0.4);
+    setDirLight2Color(settings.dirLight2Color || "#ffffff");
+    setDirLight2Pos(settings.dirLight2Pos || [-10, 10, -5]);
     setCurrentProject(project);
     setMenuOpen(false);
-  };
-  const handleDeleteProject = (projectId) => {
-    setProjects((prev) => prev.filter((p) => p.id !== projectId));
-    if (currentProject?.id === projectId) setCurrentProject(null);
-  };
-  // Add reload handler
-  const handleReload = () => window.location.reload();
+  }, []);
+
+  const handleDeleteProject = useCallback(
+    (projectId) => {
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+      if (currentProject?.id === projectId) setCurrentProject(null);
+    },
+    [currentProject]
+  );
+
+  const handleResetSettings = useCallback(() => {
+    setWireframe(false);
+    setBgColor("sky");
+    setLightIntensity(1.2);
+    setLightColor("#ffffff");
+    setAmbientIntensity(0.4);
+    setDirLight2Color("#ffffff");
+    setDirLight2Pos([-10, 10, -5]);
+    setQuality("high");
+    setEnableShaders(true);
+    setEnableEffects(false);
+    setShowGround(true);
+    setGroundOpacity(0.3);
+    setShadowQuality("high");
+    setAntialiasing(true);
+  }, []);
+
+  const handleModelLoaded = useCallback(() => {
+    setAnimateCamera(true);
+    // Reset animation flag after animation completes
+    setTimeout(() => {
+      setAnimateCamera(false);
+    }, 2500);
+  }, []);
+
+  const handleReload = useCallback(() => window.location.reload(), []);
+
+  // Memoized shadow map size calculation
+  const shadowMapSize = useMemo(() => {
+    const sizes = {
+      low: 1024,
+      medium: 2048,
+      high: 4096,
+      ultra: 8192,
+    };
+    return sizes[shadowQuality] || 2048;
+  }, [shadowQuality]);
+
+  // Memoized canvas configuration
+  const canvasConfig = useMemo(
+    () => ({
+      camera: { position: [2, 2, 2], fov: 60 },
+      style:
+        bgColor === "sky" || bgColor === "#111111" || bgColor === "#e0e7ef"
+          ? { background: "#111" }
+          : { background: bgColor },
+      dpr: antialiasing ? [1, 2] : 1,
+      shadows: true,
+      gl: {
+        antialias: antialiasing,
+        toneMapping: THREE.ACESFilmicToneMapping,
+        outputColorSpace: THREE.SRGBColorSpace,
+        physicallyCorrectLights: true,
+        shadowMapEnabled: true,
+        shadowMapType: enableShaders
+          ? THREE.PCFSoftShadowMap
+          : THREE.BasicShadowMap,
+        powerPreference: quality === "ultra" ? "high-performance" : "default",
+        preserveDrawingBuffer: true, // Enable for screenshots
+        failIfMajorPerformanceCaveat: false,
+      },
+    }),
+    [bgColor, antialiasing, enableShaders, quality]
+  );
 
   return (
     <div className="app-container">
@@ -624,14 +1003,8 @@ function App() {
         onToggleFirstPerson={handleToggleFirstPerson}
         onResetCamera={handleResetCamera}
         onScreenshot={handleScreenshot}
-        // Add reload button handler as a prop if you want to show it in Header
         onReload={handleReload}
       />
-
-      {/* Add a reload button somewhere in your UI */}
-      <div
-        style={{ position: "absolute", top: 16, right: 16, zIndex: 100 }}
-      ></div>
 
       <SideMenu
         isOpen={menuOpen}
@@ -643,7 +1016,7 @@ function App() {
         lightIntensity={lightIntensity}
         setLightIntensity={setLightIntensity}
         lightColor={lightColor}
-        setLightColor={setDirLight2Color}
+        setLightColor={setLightColor}
         animations={animations}
         animationIndex={animationIndex}
         setAnimationIndex={setAnimationIndex}
@@ -661,7 +1034,23 @@ function App() {
         setDirLight2Color={setDirLight2Color}
         dirLight2Pos={dirLight2Pos}
         setDirLight2Pos={setDirLight2Pos}
+        quality={quality}
+        setQuality={setQuality}
+        enableShaders={enableShaders}
+        setEnableShaders={setEnableShaders}
+        enableEffects={enableEffects}
+        setEnableEffects={setEnableEffects}
+        showGround={showGround}
+        setShowGround={setShowGround}
+        groundOpacity={groundOpacity}
+        setGroundOpacity={setGroundOpacity}
+        shadowQuality={shadowQuality}
+        setShadowQuality={setShadowQuality}
+        antialiasing={antialiasing}
+        setAntialiasing={setAntialiasing}
+        onResetSettings={handleResetSettings}
       />
+
       <main className="main-viewer">
         {file ? (
           <>
@@ -681,60 +1070,55 @@ function App() {
                 }}
               />
             )}
-            <Canvas
-              camera={{ position: [2, 2, 2], fov: 60 }}
-              style={
-                bgColor === "sky" ||
-                bgColor === "#111111" ||
-                bgColor === "#e0e7ef"
-                  ? { background: "#111" }
-                  : { background: bgColor }
-              }
-              dpr={[1, 2]}
-              shadows
-              gl={{
-                antialias: true,
-                toneMapping: THREE.ACESFilmicToneMapping,
-                outputColorSpace: THREE.SRGBColorSpace,
-                physicallyCorrectLights: true,
-                shadowMapEnabled: true,
-                shadowMapType: THREE.PCFSoftShadowMap,
-                powerPreference: "high-performance",
-                preserveDrawingBuffer: false,
-                failIfMajorPerformanceCaveat: false,
-              }}
-            >
-              {/* Lighting setup with shadows enabled */}
-              <ambientLight intensity={ambientIntensity} color="#fff" />
+            <Canvas {...canvasConfig}>
+              {/* Enhanced lighting setup with quality-based shadows */}
+              <ambientLight intensity={ambientIntensity} color="#ffffff" />
+
+              {/* Main directional light with enhanced shadows */}
               <directionalLight
-                position={[10, 20, 10]}
+                position={[15, 25, 15]}
                 intensity={lightIntensity}
                 color={lightColor}
-                castShadow={true}
-                shadow-mapSize-width={2048}
-                shadow-mapSize-height={2048}
-                shadow-bias={-0.001}
-                shadow-radius={8}
-                shadow-camera-near={1}
-                shadow-camera-far={50}
-                shadow-camera-left={-20}
-                shadow-camera-right={20}
-                shadow-camera-top={20}
-                shadow-camera-bottom={-20}
-                shadow-normalBias={0.01}
+                castShadow={enableShaders}
+                shadow-mapSize-width={shadowMapSize}
+                shadow-mapSize-height={shadowMapSize}
+                shadow-bias={-0.0005}
+                shadow-normalBias={0.02}
+                shadow-radius={enableShaders ? 10 : 1}
+                shadow-camera-near={0.5}
+                shadow-camera-far={100}
+                shadow-camera-left={-50}
+                shadow-camera-right={50}
+                shadow-camera-top={50}
+                shadow-camera-bottom={-50}
               />
+
+              {/* Secondary fill light */}
               <directionalLight
                 position={dirLight2Pos}
-                intensity={lightIntensity * 0.4}
+                intensity={lightIntensity * 0.3}
                 color={dirLight2Color}
-                castShadow={true}
+                castShadow={enableShaders}
+                shadow-mapSize-width={shadowMapSize / 2}
+                shadow-mapSize-height={shadowMapSize / 2}
+                shadow-bias={-0.001}
+                shadow-radius={enableShaders ? 6 : 1}
+                shadow-camera-near={1}
+                shadow-camera-far={50}
+                shadow-camera-left={-25}
+                shadow-camera-right={25}
+                shadow-camera-top={25}
+                shadow-camera-bottom={-25}
               />
+
+              {/* Rim light for better definition */}
               <directionalLight
-                position={[-15, 10, -15]}
-                intensity={0.15}
-                color="#fffbe6"
-                castShadow={true}
+                position={[-20, 15, -20]}
+                intensity={lightIntensity * 0.2}
+                color="#ffffff"
+                castShadow={false}
               />
+
               <Suspense fallback={<Html center>Loading...</Html>}>
                 <ModelViewer
                   file={file}
@@ -744,8 +1128,14 @@ function App() {
                   animationIndex={animationIndex}
                   setAnimationIndex={setAnimationIndex}
                   setLoadingProgress={setLoadingProgress}
+                  onModelLoaded={handleModelLoaded}
+                  shadowQuality={shadowQuality}
+                  enableShaders={enableShaders}
+                  showGround={showGround}
+                  groundOpacity={groundOpacity}
                 />
               </Suspense>
+
               {firstPerson ? (
                 <FirstPersonController enabled={true} />
               ) : (
@@ -761,12 +1151,15 @@ function App() {
                   maxDistance={Infinity}
                 />
               )}
-              {bgColor === "sky" && <Environment preset="sunset" background />}
+
+              {bgColor === "sky" && (
+                <Environment preset="sunset" background blur={0.1} />
+              )}
               {bgColor === "#111111" && (
-                <Environment preset="night" background />
+                <Environment preset="night" background blur={0.1} />
               )}
               {bgColor === "#e0e7ef" && (
-                <Environment preset="city" background />
+                <Environment preset="city" background blur={0.1} />
               )}
             </Canvas>
           </>
