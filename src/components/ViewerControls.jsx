@@ -4,22 +4,13 @@ const ViewerControls = ({
   firstPerson, 
   onToggleFirstPerson, 
   onResetCamera, 
-<<<<<<< HEAD
   onScreenshot
-=======
-  onScreenshot,
-  onNewProject
->>>>>>> 5277875abedd384c2955da2396cb133211c21a0d
 }) => {
   return (
     <div className="viewer-controls">
       <button
         className="control-btn new-btn"
-<<<<<<< HEAD
-        onClick={() => window.location.reload()}
-=======
-        onClick={onNewProject}
->>>>>>> 5277875abedd384c2955da2396cb133211c21a0d
+        // onClick={() => window.reload()}
         title="New Project"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

@@ -60,14 +60,6 @@ const SideMenu = ({
     };
     return descriptions[quality] || '';
   };
-<<<<<<< HEAD
-
-  // Handler for Render Quality change, calls setQuality from App.jsx
-  const handleQualityChange = (e) => {
-    setQuality(e.target.value);
-  };
-=======
->>>>>>> 5277875abedd384c2955da2396cb133211c21a0d
 
   return (
     <>
@@ -183,11 +175,7 @@ const SideMenu = ({
               <select
                 className="form-input"
                 value={quality}
-<<<<<<< HEAD
-                onChange={handleQualityChange}
-=======
                 onChange={(e) => setQuality(e.target.value)}
->>>>>>> 5277875abedd384c2955da2396cb133211c21a0d
               >
                 <option value="low">Low - Performance</option>
                 <option value="medium">Medium - Balanced</option>

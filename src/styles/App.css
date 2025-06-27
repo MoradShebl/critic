@@ -1,4 +1,3 @@
-/* Professional Real Estate 3D Viewer Styles - Enhanced */
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
 
 :root {
@@ -258,7 +257,6 @@ body {
   flex: 1;
   position: relative;
   overflow: hidden;
-  margin-top: 120px;
 }
 
 /* Enhanced Loading Screen */
