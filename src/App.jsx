@@ -12,6 +12,7 @@ import * as THREE from "three";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+import { createPortal } from "react-dom";
 
 // Components
 import Header from "./components/Header";
@@ -204,6 +205,7 @@ function FirstPersonController({ enabled }) {
   const velocity = useRef(new THREE.Vector3());
   const direction = useRef(new THREE.Vector3());
   const keys = useRef({});
+  // Allow extremely slow and extremely fast speeds
   const [walkSpeed, setWalkSpeed] = useState(2);
   const [runSpeed, setRunSpeed] = useState(4);
   const state = useRef({
@@ -216,11 +218,12 @@ function FirstPersonController({ enabled }) {
   useEffect(() => {
     if (!enabled) return;
     const handleWheel = (e) => {
+      // Allow walkSpeed: 0.0001 - 10000, runSpeed: 0.0002 - 20000
       setWalkSpeed((prev) =>
-        Math.max(0.01, Math.min(10, prev - e.deltaY * 0.01))
+        Math.max(0.0001, Math.min(10000, prev - e.deltaY * 0.005))
       );
       setRunSpeed((prev) =>
-        Math.max(0.02, Math.min(20, prev - e.deltaY * 0.02))
+        Math.max(0.0002, Math.min(20000, prev - e.deltaY * 0.01))
       );
     };
     window.addEventListener("wheel", handleWheel, { passive: false });
@@ -318,6 +321,7 @@ function ModelViewer({
   enableShaders,
   showGround,
   groundOpacity,
+  cameraPoints = [],
 }) {
   const [model, setModel] = useState(null);
   const [clock] = useState(() => new THREE.Clock());
@@ -590,7 +594,7 @@ function ModelViewer({
     if (!modelBounds) return { size: 200, y: -0.01 };
 
     return {
-      size: Math.max(modelBounds.size.x, modelBounds.size.z) * 4,
+      size: Math.max(modelBounds.size.x, modelBounds.size.z) * 8, // was *4
       y: modelBounds.box.min.y - 0.01,
     };
   }, [modelBounds]);
@@ -732,6 +736,19 @@ function ModelViewer({
         </>
       )}
 
+      {/* Spheres for saved camera points */}
+      {cameraPoints.map((pt, idx) => (
+        <mesh
+          key={pt.id}
+          position={[pt.position.x, pt.position.y, pt.position.z]}
+          castShadow
+          receiveShadow
+        >
+          <sphereGeometry args={[0.08, 24, 24]} />
+          <meshStandardMaterial color="#ffb300" emissive="#ffb300" emissiveIntensity={0.7} />
+        </mesh>
+      ))}
+
       <CameraController
         object={model}
         resetFlag={animationIndex}
@@ -770,6 +787,107 @@ function App() {
   const [shadowQuality, setShadowQuality] = useState("high");
   const [antialiasing, setAntialiasing] = useState(true);
   const [animateCamera, setAnimateCamera] = useState(false);
+  const [is2D, setIs2D] = useState(false);
+
+  // Camera points state
+  const [cameraPoints, setCameraPoints] = useState([]);
+  const [showSavePopup, setShowSavePopup] = useState(false);
+  const [newPointName, setNewPointName] = useState("");
+  const [cameraToGo, setCameraToGo] = useState(null);
+
+  // Ref to access camera in Canvas
+  const cameraRef = useRef();
+
+  // Save camera position handler
+  const handleSaveCameraPoint = useCallback(() => {
+    setShowSavePopup(true);
+    setNewPointName("");
+  }, []);
+
+  // Actually save the camera point
+  const handleConfirmSavePoint = useCallback(() => {
+    if (!cameraRef.current || !newPointName.trim()) return;
+    const cam = cameraRef.current;
+    setCameraPoints((prev) => [
+      ...prev,
+      {
+        name: newPointName.trim(),
+        position: cam.position.clone(),
+        target: cam.target ? cam.target.clone() : new THREE.Vector3(0, 0, 0),
+        id: Date.now(),
+      },
+    ]);
+    setShowSavePopup(false);
+    setNewPointName("");
+  }, [newPointName]);
+
+  // Animate camera to a saved point
+  const handleGoToPoint = useCallback((pt) => {
+    setCameraToGo({
+      ...pt,
+      // Add a random animation offset to avoid identical start/end
+      animSeed: Math.random(),
+    });
+  }, []);
+
+  // Camera animation effect for going to point (improved)
+  useEffect(() => {
+    if (!cameraToGo || !cameraRef.current) return;
+    const cam = cameraRef.current;
+    const controls = cam.controls;
+    const start = {
+      pos: cam.position.clone(),
+      target: controls ? controls.target.clone() : new THREE.Vector3(0, 0, 0),
+    };
+    const end = {
+      pos: cameraToGo.position.clone(),
+      target: cameraToGo.target.clone(),
+    };
+    // Animation: ease in, arc, ease out
+    const duration = 1600;
+    const startTime = performance.now();
+    // Compute arc control point for camera (midpoint above line)
+    const mid = start.pos.clone().lerp(end.pos, 0.5);
+    const up = new THREE.Vector3(0, 1, 0);
+    const arcHeight = start.pos.distanceTo(end.pos) * 0.25 + 0.5;
+    mid.addScaledVector(up, arcHeight);
+
+    function animate() {
+      const t = Math.min((performance.now() - startTime) / duration, 1);
+      // Smoothstep for ease in/out
+      const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      // Quadratic bezier for arc
+      function bezier(a, b, c, t) {
+        const ab = a.clone().lerp(b, t);
+        const bc = b.clone().lerp(c, t);
+        return ab.lerp(bc, t);
+      }
+      const camPos = bezier(start.pos, mid, end.pos, ease);
+      cam.position.copy(camPos);
+      if (controls) {
+        // Target moves linearly for smooth look
+        controls.target.lerpVectors(start.target, end.target, ease);
+        controls.update();
+      }
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        setCameraToGo(null);
+      }
+    }
+    animate();
+    // eslint-disable-next-line
+  }, [cameraToGo]);
+
+  // Attach camera ref in Canvas
+  function CameraRefAttacher() {
+    const { camera, controls } = useThree();
+    useEffect(() => {
+      cameraRef.current = camera;
+      cameraRef.current.controls = controls;
+    }, [camera, controls]);
+    return null;
+  }
 
   // Track loading progress globally
   useEffect(() => {
@@ -869,6 +987,7 @@ function App() {
         dirLight2Color,
         dirLight2Pos,
       },
+      points: cameraPoints, // <-- Save camera points with project
       savedAt: new Date().toISOString(),
     };
     setProjects((prev) => [...prev, project]);
@@ -890,6 +1009,7 @@ function App() {
     ambientIntensity,
     dirLight2Color,
     dirLight2Pos,
+    cameraPoints, // <-- Add cameraPoints as dependency
   ]);
 
   const handleLoadProject = useCallback((project) => {
@@ -916,6 +1036,7 @@ function App() {
     setAmbientIntensity(settings.ambientIntensity || 0.4);
     setDirLight2Color(settings.dirLight2Color || "#ffffff");
     setDirLight2Pos(settings.dirLight2Pos || [-10, 10, -5]);
+    setCameraPoints(project.points || []); // <-- Restore camera points
     setCurrentProject(project);
     setMenuOpen(false);
   }, []);
@@ -993,8 +1114,184 @@ function App() {
     [bgColor, antialiasing, enableShaders, quality]
   );
 
+  // 2D/3D toggle handler
+  const handleToggle2D3D = useCallback(() => setIs2D(v => !v), []);
+
   return (
     <div className="app-container">
+      {/* Save Camera Point Button at the bottom */}
+      {file && (
+        <button
+          style={{
+            position: "fixed",
+            left: "50%",
+            bottom: 80,
+            transform: "translateX(-50%)",
+            zIndex: 21,
+            padding: "10px 28px",
+            background: "#222",
+            color: "#fff",
+            border: "1.5px solid #444",
+            borderRadius: 10,
+            fontWeight: 600,
+            fontSize: 17,
+            cursor: "pointer",
+            opacity: 0.96,
+            boxShadow: "0 2px 12px #000a",
+          }}
+          onClick={handleSaveCameraPoint}
+        >
+          Save Camera Point
+        </button>
+      )}
+
+      {/* Points List at the bottom of the screen (add ball for each point) */}
+      {file && cameraPoints.length > 0 && (
+        <div
+          style={{
+            position: "fixed",
+            left: "50%",
+            bottom: 24,
+            transform: "translateX(-50%)",
+            zIndex: 20,
+            background: "#181818",
+            color: "#fff",
+            border: "1.5px solid #333",
+            borderRadius: 12,
+            padding: "10px 24px",
+            minWidth: 160,
+            boxShadow: "0 2px 12px #000a",
+            maxWidth: "90vw",
+            maxHeight: 120,
+            overflowX: "auto",
+            overflowY: "hidden",
+            display: "flex",
+            alignItems: "center",
+            gap: 18,
+          }}
+        >
+          <div style={{ fontWeight: 700, fontSize: 15, marginRight: 12 }}>
+            Points:
+          </div>
+          {cameraPoints.map((pt) => (
+            <div
+              key={pt.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                padding: "7px 16px",
+                borderRadius: 7,
+                background: "#232323",
+                border: "1px solid #333",
+                cursor: "pointer",
+                fontSize: 15,
+                color: "#fff",
+                opacity: 0.92,
+                fontWeight: 600,
+                marginRight: 2,
+                whiteSpace: "nowrap",
+                transition: "background 0.15s, color 0.15s",
+              }}
+              onClick={() => handleGoToPoint(pt)}
+              onMouseOver={e => e.currentTarget.style.background = "#444"}
+              onMouseOut={e => e.currentTarget.style.background = "#232323"}
+            >
+              {/* Ball icon */}
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 16,
+                  height: 16,
+                  borderRadius: "50%",
+                  background: "radial-gradient(circle at 30% 30%, #ffd700 70%, #b8860b 100%)",
+                  boxShadow: "0 0 4px #ffb300",
+                  marginRight: 2,
+                  border: "1.5px solid #ffb300",
+                }}
+              />
+              {pt.name}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Save Camera Point Popup */}
+      {showSavePopup &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100vw",
+              height: "100vh",
+              background: "rgba(0,0,0,0.45)",
+              zIndex: 1000,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            onClick={() => setShowSavePopup(false)}
+          >
+            <div
+              style={{
+                background: "#181818",
+                borderRadius: 14,
+                padding: 32,
+                minWidth: 320,
+                boxShadow: "0 4px 32px #000a",
+                border: "1.5px solid #333",
+                display: "flex",
+                flexDirection: "column",
+                gap: 18,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ fontWeight: 700, fontSize: 20, color: "#fff" }}>
+                Save Camera Point
+              </div>
+              <input
+                type="text"
+                placeholder="Enter point name"
+                value={newPointName}
+                onChange={(e) => setNewPointName(e.target.value)}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 7,
+                  border: "1.5px solid #444",
+                  fontSize: 16,
+                  background: "#222",
+                  color: "#fff",
+                  outline: "none",
+                }}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleConfirmSavePoint();
+                }}
+              />
+              <button
+                style={{
+                  marginTop: 10,
+                  padding: "10px 0",
+                  background: "#fff",
+                  color: "#181818",
+                  border: "none",
+                  borderRadius: 7,
+                  fontWeight: 700,
+                  fontSize: 17,
+                  cursor: "pointer",
+                  opacity: 0.95,
+                }}
+                onClick={handleConfirmSavePoint}
+              >
+                Save
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
+
       <Header
         menuOpen={menuOpen}
         setMenuOpen={setMenuOpen}
@@ -1051,6 +1348,30 @@ function App() {
         onResetSettings={handleResetSettings}
       />
 
+      {/* 2D/3D Toggle Button at right bottom */}
+      <button
+        style={{
+          position: "fixed",
+          right: 28,
+          bottom: 28,
+          zIndex: 30,
+          padding: "12px 26px",
+          background: "#232323",
+          color: "#fff",
+          border: "1.5px solid #444",
+          borderRadius: 10,
+          fontWeight: 700,
+          fontSize: 17,
+          cursor: "pointer",
+          opacity: 0.97,
+          boxShadow: "0 2px 12px #000a",
+          transition: "background 0.15s, color 0.15s",
+        }}
+        onClick={handleToggle2D3D}
+      >
+        {is2D ? "Switch to 3D" : "Switch to 2D"}
+      </button>
+
       <main className="main-viewer">
         {file ? (
           <>
@@ -1071,6 +1392,7 @@ function App() {
               />
             )}
             <Canvas {...canvasConfig}>
+              <CameraRefAttacher />
               {/* Enhanced lighting setup with quality-based shadows */}
               <ambientLight intensity={ambientIntensity} color="#ffffff" />
 
@@ -1119,6 +1441,9 @@ function App() {
                 castShadow={false}
               />
 
+              {/* Shadow light that follows the camera */}
+              <CameraFollowerShadowLight />
+
               <Suspense fallback={<Html center>Loading...</Html>}>
                 <ModelViewer
                   file={file}
@@ -1133,25 +1458,26 @@ function App() {
                   enableShaders={enableShaders}
                   showGround={showGround}
                   groundOpacity={groundOpacity}
+                  cameraPoints={cameraPoints}
                 />
               </Suspense>
-
-              {firstPerson ? (
-                <FirstPersonController enabled={true} />
-              ) : (
-                <OrbitControls
-                  makeDefault
-                  key={String(resetCameraFlag)}
-                  enablePan={true}
-                  enableZoom={true}
-                  enableRotate={true}
-                  enableDamping={true}
-                  dampingFactor={0.08}
-                  minDistance={0}
-                  maxDistance={Infinity}
-                />
+              {is2D ? null : (
+                firstPerson ? (
+                  <FirstPersonController enabled={true} />
+                ) : (
+                  <OrbitControls
+                    makeDefault
+                    key={String(resetCameraFlag)}
+                    enablePan={true}
+                    enableZoom={true}
+                    enableRotate={true}
+                    enableDamping={true}
+                    dampingFactor={0.08}
+                    minDistance={0}
+                    maxDistance={Infinity}
+                  />
+                )
               )}
-
               {bgColor === "sky" && (
                 <Environment preset="sunset" background blur={0.1} />
               )}
@@ -1161,6 +1487,8 @@ function App() {
               {bgColor === "#e0e7ef" && (
                 <Environment preset="city" background blur={0.1} />
               )}
+              {/* If in 2D mode, set camera and controls for 2D top-down view */}
+              {is2D && <TopDown2DCamera />}
             </Canvas>
           </>
         ) : (
@@ -1173,4 +1501,106 @@ function App() {
   );
 }
 
+// TopDown2DCamera component to force camera to top-down orthographic view with pan/zoom
+function TopDown2DCamera() {
+  const { camera, gl, set } = useThree();
+  const controlsRef = useRef();
+
+  useEffect(() => {
+    // Switch to orthographic camera for 2D
+    const aspect = gl.domElement.width / gl.domElement.height;
+    const d = 10;
+    const orthoCam = new THREE.OrthographicCamera(
+      -d * aspect,
+      d * aspect,
+      d,
+      -d,
+      0.01,
+      1000
+    );
+    orthoCam.position.set(0, 20, 0);
+    orthoCam.up.set(0, 0, -1);
+    orthoCam.lookAt(0, 0, 0);
+    orthoCam.zoom = 2.5;
+    orthoCam.updateProjectionMatrix();
+    set({ camera: orthoCam });
+
+    // Show mouse cursor in 2D mode
+    const canvas = gl.domElement;
+    const prevCursor = canvas.style.cursor;
+    canvas.style.cursor = "default";
+
+    gl.renderLists.dispose();
+
+    return () => {
+      set({ camera });
+      canvas.style.cursor = prevCursor;
+      gl.renderLists.dispose();
+    };
+    // eslint-disable-next-line
+  }, []);
+
+  // Add OrbitControls for pan/zoom only (disable rotate)
+  return (
+    <OrbitControls
+      ref={controlsRef}
+      makeDefault
+      enablePan={true}
+      enableZoom={true}
+      enableRotate={false}
+      dampingFactor={0.1}
+      minZoom={0.2}
+      maxZoom={10}
+      mouseButtons={{
+        LEFT: 0, // disable left button rotate
+        MIDDLE: 1,
+        RIGHT: 2,
+      }}
+      touches={{
+        ONE: 2, // pan with one finger
+        TWO: 1, // zoom with two fingers
+      }}
+    />
+  );
+}
+
+// Add CameraFollowerShadowLight definition
+function CameraFollowerShadowLight() {
+  const { camera, scene } = useThree();
+  const lightRef = useRef();
+
+  useFrame(() => {
+    if (lightRef.current && camera) {
+      const offset = new THREE.Vector3(0, 12, -30).applyQuaternion(camera.quaternion);
+      lightRef.current.position.copy(camera.position).add(offset);
+      const target = new THREE.Object3D();
+      target.position.copy(camera.position).add(
+        new THREE.Vector3(0, 0, -50).applyQuaternion(camera.quaternion)
+      );
+      lightRef.current.target.position.copy(target.position);
+      if (!scene.children.includes(lightRef.current.target)) {
+        scene.add(lightRef.current.target);
+      }
+    }
+  });
+
+  return (
+    <directionalLight
+      ref={lightRef}
+      intensity={1.5}
+      color="#fffbe0"
+      castShadow
+      shadow-mapSize-width={4096}
+      shadow-mapSize-height={4096}
+      shadow-bias={-0.001}
+      shadow-radius={18}
+      shadow-camera-near={0.5}
+      shadow-camera-far={200}
+      shadow-camera-left={-60}
+      shadow-camera-right={60}
+      shadow-camera-top={60}
+      shadow-camera-bottom={-60}
+    />
+  );
+}
 export default App;

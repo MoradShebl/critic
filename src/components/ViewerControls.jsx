@@ -4,7 +4,11 @@ const ViewerControls = ({
   firstPerson, 
   onToggleFirstPerson, 
   onResetCamera, 
-  onScreenshot
+  onScreenshot,
+  onSavePosition,
+  onTogglePoints,
+  hasModel,
+  savedPointsCount
 }) => {
   return (
     <div className="viewer-controls">
@@ -21,6 +25,34 @@ const ViewerControls = ({
         </svg>
         New
       </button>
+
+      {hasModel && !firstPerson && (
+        <button
+          className="control-btn save-position-btn"
+          onClick={onSavePosition}
+          title="Save Current Camera Position"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+          Save Position
+        </button>
+      )}
+
+      {hasModel && savedPointsCount > 0 && (
+        <button
+          className="control-btn points-btn"
+          onClick={onTogglePoints}
+          title="View Saved Points"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+          Points ({savedPointsCount})
+        </button>
+      )}
 
       <button
         className={`control-btn ${firstPerson ? 'active' : ''}`}
@@ -65,6 +97,27 @@ const ViewerControls = ({
           <circle cx="12" cy="13" r="4" />
         </svg>
         Screenshot
+      </button>
+
+      {/* Full Screen Button with SVG icon instead of Font Awesome */}
+      <button
+        className="control-btn fullscreen-btn"
+        onClick={() => {
+          if (document.fullscreenElement) {
+            document.exitFullscreen();
+          } else {
+            document.documentElement.requestFullscreen();
+          }
+        }}
+        title="Toggle Full Screen"
+      >
+        {/* SVG expand icon */}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <polyline points="4 8 4 4 8 4" />
+          <polyline points="20 8 20 4 16 4" />
+          <polyline points="4 16 4 20 8 20" />
+          <polyline points="20 16 20 20 16 20" />
+        </svg>
       </button>
     </div>
   );
