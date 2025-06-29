@@ -42,6 +42,9 @@ const SideMenu = ({
   onResetSettings,
   enableLightBox,
   setEnableLightBox,
+  // Sun lighting props
+  timeOfDay,
+  setTimeOfDay
 }) => {
   const formatFileSize = (bytes) => {
     if (!bytes) return 'Unknown';
@@ -58,6 +61,15 @@ const SideMenu = ({
       ultra: 'Maximum quality with all effects'
     };
     return descriptions[quality] || '';
+  };
+
+  const getTimeDescription = (hour) => {
+    if (hour < 6) return 'Night';
+    if (hour < 8) return 'Dawn';
+    if (hour < 12) return 'Morning';
+    if (hour < 16) return 'Afternoon';
+    if (hour < 18) return 'Evening';
+    return 'Night';
   };
 
   return (
@@ -81,6 +93,83 @@ const SideMenu = ({
         </div>
 
         <div className="menu-content">
+          {/* Sun Lighting Section */}
+          <div className="menu-section">
+            <h3 className="section-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="5" />
+                <line x1="12" y1="1" x2="12" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="23" />
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                <line x1="1" y1="12" x2="3" y2="12" />
+                <line x1="21" y1="12" x2="23" y2="12" />
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+              </svg>
+              Sun Lighting
+            </h3>
+
+            <div className="form-group">
+              <label className="form-label">
+                Time of Day
+                <span className="range-value">{timeOfDay}:00 ({getTimeDescription(timeOfDay)})</span>
+              </label>
+              <input
+                type="range"
+                className="form-input"
+                min="0"
+                max="24"
+                step="0.5"
+                value={timeOfDay}
+                onChange={(e) => setTimeOfDay(Number(e.target.value))}
+              />
+              <div className="form-hint">Drag to simulate different times of day</div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">
+                Sun Intensity
+                <span className="range-value">{lightIntensity.toFixed(2)}</span>
+              </label>
+              <input
+                type="range"
+                className="form-input"
+                min="0.1"
+                max="5"
+                step="0.1"
+                value={lightIntensity}
+                onChange={(e) => setLightIntensity(Number(e.target.value))}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">
+                Ambient Light
+                <span className="range-value">{ambientIntensity.toFixed(2)}</span>
+              </label>
+              <input
+                type="range"
+                className="form-input"
+                min="0"
+                max="2"
+                step="0.01"
+                value={ambientIntensity}
+                onChange={(e) => setAmbientIntensity(Number(e.target.value))}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Sun Color</label>
+              <input
+                type="color"
+                className="form-input color-input"
+                value={lightColor}
+                onChange={(e) => setLightColor(e.target.value)}
+              />
+            </div>
+          </div>
+
           {/* Project Management */}
           <div className="menu-section">
             <h3 className="section-title">
@@ -209,7 +298,7 @@ const SideMenu = ({
                 />
                 <label htmlFor="enableShaders" className="toggle-label">
                   <span className="toggle-switch"></span>
-                  Advanced Shaders & Shadows
+                  Advanced Shadows & Lighting
                 </label>
               </div>
 
@@ -261,9 +350,9 @@ const SideMenu = ({
                 value={bgColor}
                 onChange={(e) => setBgColor(e.target.value)}
               >
-                <option value="sky">Sunset Sky</option>
+                <option value="sky">Dynamic Sky</option>
                 <option value="#111111">Night</option>
-                <option value="#e0e7ef">City</option>
+                <option value="#e0e7ef">Studio</option>
               </select>
             </div>
 
@@ -278,7 +367,7 @@ const SideMenu = ({
                 />
                 <label htmlFor="showGround" className="toggle-label">
                   <span className="toggle-switch"></span>
-                  Reflective Ground
+                  Ground Plane
                 </label>
               </div>
 
@@ -292,7 +381,7 @@ const SideMenu = ({
                 />
                 <label htmlFor="enableLightBox" className="toggle-label">
                   <span className="toggle-switch"></span>
-                  Smart Light Box
+                  Studio Lighting
                 </label>
               </div>
             </div>
@@ -314,78 +403,6 @@ const SideMenu = ({
                 />
               </div>
             )}
-          </div>
-
-          {/* Lighting Settings */}
-          <div className="menu-section">
-            <h3 className="section-title">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="5" />
-                <line x1="12" y1="1" x2="12" y2="3" />
-                <line x1="12" y1="21" x2="12" y2="23" />
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                <line x1="1" y1="12" x2="3" y2="12" />
-                <line x1="21" y1="12" x2="23" y2="12" />
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-              </svg>
-              Lighting
-            </h3>
-
-            <div className="form-group">
-              <label className="form-label">
-                Ambient Light
-                <span className="range-value">{ambientIntensity.toFixed(2)}</span>
-              </label>
-              <input
-                type="range"
-                className="form-input"
-                min="0"
-                max="2"
-                step="0.01"
-                value={ambientIntensity}
-                onChange={(e) => setAmbientIntensity(Number(e.target.value))}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">
-                Main Light Intensity
-                <span className="range-value">{lightIntensity.toFixed(2)}</span>
-              </label>
-              <input
-                type="range"
-                className="form-input"
-                min="0.1"
-                max="3"
-                step="0.01"
-                value={lightIntensity}
-                onChange={(e) => setLightIntensity(Number(e.target.value))}
-              />
-            </div>
-
-            <div className="color-group">
-              <div className="form-group">
-                <label className="form-label">Main Light Color</label>
-                <input
-                  type="color"
-                  className="form-input color-input"
-                  value={lightColor}
-                  onChange={(e) => setLightColor(e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Fill Light Color</label>
-                <input
-                  type="color"
-                  className="form-input color-input"
-                  value={dirLight2Color}
-                  onChange={(e) => setDirLight2Color(e.target.value)}
-                />
-              </div>
-            </div>
           </div>
 
           {/* Animation Controls */}
@@ -411,55 +428,6 @@ const SideMenu = ({
                     </option>
                   ))}
                 </select>
-              </div>
-            </div>
-          )}
-
-          {/* Walk Mode Instructions */}
-          {firstPerson && (
-            <div className="menu-section">
-              <div className="walk-mode-panel">
-                <div className="panel-header">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                  <h4>Walk Mode Controls</h4>
-                </div>
-                <div className="controls-grid">
-                  <div className="control-item">
-                    <kbd>W</kbd>
-                    <span>Forward</span>
-                  </div>
-                  <div className="control-item">
-                    <kbd>S</kbd>
-                    <span>Backward</span>
-                  </div>
-                  <div className="control-item">
-                    <kbd>A</kbd>
-                    <span>Left</span>
-                  </div>
-                  <div className="control-item">
-                    <kbd>D</kbd>
-                    <span>Right</span>
-                  </div>
-                  <div className="control-item">
-                    <kbd>Q</kbd>
-                    <span>Down</span>
-                  </div>
-                  <div className="control-item">
-                    <kbd>E</kbd>
-                    <span>Up</span>
-                  </div>
-                  <div className="control-item">
-                    <kbd>Shift</kbd>
-                    <span>Run</span>
-                  </div>
-                  <div className="control-item">
-                    <kbd>Space</kbd>
-                    <span>Boost</span>
-                  </div>
-                </div>
               </div>
             </div>
           )}

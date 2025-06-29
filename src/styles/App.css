@@ -247,6 +247,28 @@ body {
   color: var(--primary-bg);
 }
 
+.control-btn.save-position-btn {
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+  border-color: #4CAF50;
+  color: white;
+}
+
+.control-btn.save-position-btn:hover {
+  background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+  box-shadow: 0 4px 16px rgba(76, 175, 80, 0.3);
+}
+
+.control-btn.points-btn {
+  background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+  border-color: #2196F3;
+  color: white;
+}
+
+.control-btn.points-btn:hover {
+  background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+  box-shadow: 0 4px 16px rgba(33, 150, 243, 0.3);
+}
+
 .control-btn.screenshot-btn:hover {
   background: linear-gradient(135deg, #ffffff 0%, #cccccc 100%);
   border-color: var(--warning);
