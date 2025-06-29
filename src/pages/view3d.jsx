@@ -15,9 +15,9 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { createPortal } from "react-dom";
 
 // Components
-import Header from "../components/Header";
-import FileUpload from "../components/FileUpload";
-import SideMenu from "../components/SideMenu";
+import Header from "../components/3dView/Header";
+import FileUpload from "../components/3dView/FileUpload";
+import SideMenu from "../components/3dView/SideMenu";
 
 // Styles
 import "../styles/App.css";
