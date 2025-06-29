@@ -8,7 +8,9 @@ const ViewerControls = ({
   onSavePosition,
   onTogglePoints,
   hasModel,
-  savedPointsCount
+  savedPointsCount,
+  is2D,
+  onToggle2D
 }) => {
   return (
     <div className="viewer-controls">
@@ -26,7 +28,7 @@ const ViewerControls = ({
         New
       </button>
 
-      {hasModel && !firstPerson && (
+      {hasModel && !firstPerson && !is2D && (
         <button
           className="control-btn save-position-btn"
           onClick={onSavePosition}
@@ -40,7 +42,7 @@ const ViewerControls = ({
         </button>
       )}
 
-      {hasModel && savedPointsCount > 0 && (
+      {hasModel && savedPointsCount > 0 && !is2D && (
         <button
           className="control-btn points-btn"
           onClick={onTogglePoints}
@@ -54,10 +56,41 @@ const ViewerControls = ({
         </button>
       )}
 
+      {hasModel && (
+        <button
+          className={`control-btn ${is2D ? 'active' : ''}`}
+          onClick={onToggle2D}
+          title={is2D ? "Exit 2D Top View" : "Enter 2D Top View"}
+        >
+          {is2D ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+              <path d="M2 17l10 5 10-5"/>
+              <path d="M2 12l10 5 10-5"/>
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <path d="M9 9h6v6H9z"/>
+              <path d="M16 3.5v3"/>
+              <path d="M20.5 8h-3"/>
+              <path d="M16 20.5v-3"/>
+              <path d="M20.5 16h-3"/>
+              <path d="M8 3.5v3"/>
+              <path d="M3.5 8h3"/>
+              <path d="M8 20.5v-3"/>
+              <path d="M3.5 16h3"/>
+            </svg>
+          )}
+          {is2D ? 'Exit 2D' : '2D View'}
+        </button>
+      )}
+
       <button
         className={`control-btn ${firstPerson ? 'active' : ''}`}
         onClick={onToggleFirstPerson}
         title={firstPerson ? "Exit Walk Mode" : "Enter Walk Mode"}
+        disabled={is2D}
       >
         {firstPerson ? (
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -99,7 +132,6 @@ const ViewerControls = ({
         Screenshot
       </button>
 
-      {/* Full Screen Button with SVG icon instead of Font Awesome */}
       <button
         className="control-btn fullscreen-btn"
         onClick={() => {
@@ -111,7 +143,6 @@ const ViewerControls = ({
         }}
         title="Toggle Full Screen"
       >
-        {/* SVG expand icon */}
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <polyline points="4 8 4 4 8 4" />
           <polyline points="20 8 20 4 16 4" />

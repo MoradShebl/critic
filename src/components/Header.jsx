@@ -9,6 +9,12 @@ const Header = ({
   onResetCamera,
   onScreenshot,
   onNewProject,
+  is2D,
+  onToggle2D,
+  hasModel,
+  onSavePosition,
+  onTogglePoints,
+  savedPointsCount
 }) => {
   return (
     <header className="header">
@@ -111,6 +117,12 @@ const Header = ({
           onResetCamera={onResetCamera}
           onScreenshot={onScreenshot}
           onNewProject={onNewProject}
+          is2D={is2D}
+          onToggle2D={onToggle2D}
+          hasModel={hasModel}
+          onSavePosition={onSavePosition}
+          onTogglePoints={onTogglePoints}
+          savedPointsCount={savedPointsCount}
         />
       </div>
     </header>

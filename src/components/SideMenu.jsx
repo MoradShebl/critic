@@ -40,6 +40,8 @@ const SideMenu = ({
   antialiasing,
   setAntialiasing,
   onResetSettings,
+  enableLightBox,
+  setEnableLightBox,
 }) => {
   const formatFileSize = (bytes) => {
     if (!bytes) return 'Unknown';
@@ -266,7 +268,6 @@ const SideMenu = ({
             </div>
 
             <div className="toggle-group">
-
               <div className="toggle-item">
                 <input
                   type="checkbox"
@@ -278,6 +279,20 @@ const SideMenu = ({
                 <label htmlFor="showGround" className="toggle-label">
                   <span className="toggle-switch"></span>
                   Reflective Ground
+                </label>
+              </div>
+
+              <div className="toggle-item">
+                <input
+                  type="checkbox"
+                  id="enableLightBox"
+                  className="toggle-input"
+                  checked={enableLightBox}
+                  onChange={(e) => setEnableLightBox(e.target.checked)}
+                />
+                <label htmlFor="enableLightBox" className="toggle-label">
+                  <span className="toggle-switch"></span>
+                  Smart Light Box
                 </label>
               </div>
             </div>

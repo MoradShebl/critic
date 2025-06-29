@@ -322,6 +322,7 @@ function ModelViewer({
   showGround,
   groundOpacity,
   cameraPoints = [],
+  enableLightBox,
 }) {
   const [model, setModel] = useState(null);
   const [clock] = useState(() => new THREE.Clock());
@@ -599,6 +600,55 @@ function ModelViewer({
     };
   }, [modelBounds]);
 
+  // Light Box System - Creates a bounding box of lights around the model
+  const lightBoxLights = useMemo(() => {
+    if (!enableLightBox || !modelBounds) return [];
+
+    const { center, size } = modelBounds;
+    const lights = [];
+    
+    // Make the light box much larger
+    const boxSize = Math.max(size.x, size.y, size.z) * 3;
+    const lightIntensity = 0.8;
+    const lightDistance = boxSize * 1.5;
+
+    // Create 11 strategic point lights around the model
+    const positions = [
+      // Top lights
+      [center.x, center.y + boxSize, center.z], // Top center
+      [center.x + boxSize, center.y + boxSize, center.z + boxSize], // Top front right
+      [center.x - boxSize, center.y + boxSize, center.z + boxSize], // Top front left
+      [center.x + boxSize, center.y + boxSize, center.z - boxSize], // Top back right
+      [center.x - boxSize, center.y + boxSize, center.z - boxSize], // Top back left
+      
+      // Side lights
+      [center.x + boxSize, center.y, center.z], // Right
+      [center.x - boxSize, center.y, center.z], // Left
+      [center.x, center.y, center.z + boxSize], // Front
+      [center.x, center.y, center.z - boxSize], // Back
+      
+      // Bottom lights
+      [center.x, center.y - boxSize * 0.5, center.z], // Bottom center
+      [center.x, center.y + boxSize * 0.3, center.z], // Mid level
+    ];
+
+    positions.forEach((pos, index) => {
+      lights.push(
+        <pointLight
+          key={`lightbox-${index}`}
+          position={pos}
+          intensity={lightIntensity}
+          distance={lightDistance}
+          decay={1}
+          color="#ffffff"
+          castShadow={false} // Disable shadows for performance
+        />
+      );
+    });
+
+    return lights;
+  }, [enableLightBox, modelBounds]);
+
   if (!model) {
     return (
       <Html center>
@@ -702,6 +752,10 @@ function ModelViewer({
       {modelLights.map((light, idx) => (
         <primitive object={light} key={light.uuid || idx} />
       ))}
+      
+      {/* Light Box System */}
+      {lightBoxLights}
+      
       {/* Enhanced shadow catcher plane */}
       {showGround && (
         <>
@@ -759,6 +813,78 @@ function ModelViewer({
   );
 }
 
+// Virtual Tour System
+function VirtualTour({ cameraPoints, isPlaying, speed, onComplete }) {
+  const { camera, controls } = useThree();
+  const tourRef = useRef({
+    startTime: 0,
+    currentSegment: 0,
+    isActive: false,
+  });
+
+  useFrame(() => {
+    if (!isPlaying || cameraPoints.length < 2) return;
+
+    if (!tourRef.current.isActive) {
+      tourRef.current.isActive = true;
+      tourRef.current.startTime = performance.now();
+      tourRef.current.currentSegment = 0;
+      if (controls) controls.enabled = false;
+    }
+
+    const elapsed = (performance.now() - tourRef.current.startTime) * speed;
+    const segmentDuration = 3000; // 3 seconds per segment
+    const totalSegments = cameraPoints.length - 1;
+    const currentSegmentIndex = Math.floor(elapsed / segmentDuration);
+
+    if (currentSegmentIndex >= totalSegments) {
+      // Tour complete
+      tourRef.current.isActive = false;
+      if (controls) controls.enabled = true;
+      onComplete();
+      return;
+    }
+
+    const segmentProgress = (elapsed % segmentDuration) / segmentDuration;
+    const easeProgress = easeInOutCubic(segmentProgress);
+
+    const startPoint = cameraPoints[currentSegmentIndex];
+    const endPoint = cameraPoints[currentSegmentIndex + 1];
+
+    // Create smooth bezier curve between points
+    const midPoint = startPoint.position.clone().lerp(endPoint.position, 0.5);
+    midPoint.y += Math.max(2, startPoint.position.distanceTo(endPoint.position) * 0.3);
+
+    // Quadratic bezier interpolation
+    const t = easeProgress;
+    const oneMinusT = 1 - t;
+    const position = startPoint.position.clone()
+      .multiplyScalar(oneMinusT * oneMinusT)
+      .add(midPoint.clone().multiplyScalar(2 * oneMinusT * t))
+      .add(endPoint.position.clone().multiplyScalar(t * t));
+
+    camera.position.copy(position);
+    
+    // Smooth target interpolation
+    const target = startPoint.target.clone().lerp(endPoint.target, easeProgress);
+    camera.lookAt(target);
+    
+    if (controls) {
+      controls.target.copy(target);
+      controls.update();
+    }
+  });
+
+  useEffect(() => {
+    if (!isPlaying) {
+      tourRef.current.isActive = false;
+      if (controls) controls.enabled = true;
+    }
+  }, [isPlaying, controls]);
+
+  return null;
+}
+
 function App() {
   const [file, setFile] = useState(null);
   const [wireframe, setWireframe] = useState(false);
@@ -788,12 +914,18 @@ function App() {
   const [antialiasing, setAntialiasing] = useState(true);
   const [animateCamera, setAnimateCamera] = useState(false);
   const [is2D, setIs2D] = useState(false);
+  const [enableLightBox, setEnableLightBox] = useState(false);
 
   // Camera points state
   const [cameraPoints, setCameraPoints] = useState([]);
   const [showSavePopup, setShowSavePopup] = useState(false);
   const [newPointName, setNewPointName] = useState("");
   const [cameraToGo, setCameraToGo] = useState(null);
+  const [showPointsManager, setShowPointsManager] = useState(false);
+
+  // Virtual Tour state
+  const [tourPlaying, setTourPlaying] = useState(false);
+  const [tourSpeed, setTourSpeed] = useState(1);
 
   // Ref to access camera in Canvas
   const cameraRef = useRef();
@@ -808,18 +940,24 @@ function App() {
   const handleConfirmSavePoint = useCallback(() => {
     if (!cameraRef.current || !newPointName.trim()) return;
     const cam = cameraRef.current;
+    const controls = cam.controls;
     setCameraPoints((prev) => [
       ...prev,
       {
         name: newPointName.trim(),
         position: cam.position.clone(),
-        target: cam.target ? cam.target.clone() : new THREE.Vector3(0, 0, 0),
+        target: controls ? controls.target.clone() : new THREE.Vector3(0, 0, 0),
         id: Date.now(),
       },
     ]);
     setShowSavePopup(false);
     setNewPointName("");
   }, [newPointName]);
+
+  // Remove camera point
+  const handleRemovePoint = useCallback((pointId) => {
+    setCameraPoints(prev => prev.filter(pt => pt.id !== pointId));
+  }, []);
 
   // Animate camera to a saved point
   const handleGoToPoint = useCallback((pt) => {
@@ -878,6 +1016,20 @@ function App() {
     animate();
     // eslint-disable-next-line
   }, [cameraToGo]);
+
+  // Virtual Tour handlers
+  const handleStartTour = useCallback(() => {
+    if (cameraPoints.length < 2) return;
+    setTourPlaying(true);
+  }, [cameraPoints.length]);
+
+  const handleStopTour = useCallback(() => {
+    setTourPlaying(false);
+  }, []);
+
+  const handleTourComplete = useCallback(() => {
+    setTourPlaying(false);
+  }, []);
 
   // Attach camera ref in Canvas
   function CameraRefAttacher() {
@@ -986,6 +1138,7 @@ function App() {
         ambientIntensity,
         dirLight2Color,
         dirLight2Pos,
+        enableLightBox,
       },
       points: cameraPoints, // <-- Save camera points with project
       savedAt: new Date().toISOString(),
@@ -1009,6 +1162,7 @@ function App() {
     ambientIntensity,
     dirLight2Color,
     dirLight2Pos,
+    enableLightBox,
     cameraPoints, // <-- Add cameraPoints as dependency
   ]);
 
@@ -1036,6 +1190,7 @@ function App() {
     setAmbientIntensity(settings.ambientIntensity || 0.4);
     setDirLight2Color(settings.dirLight2Color || "#ffffff");
     setDirLight2Pos(settings.dirLight2Pos || [-10, 10, -5]);
+    setEnableLightBox(settings.enableLightBox || false);
     setCameraPoints(project.points || []); // <-- Restore camera points
     setCurrentProject(project);
     setMenuOpen(false);
@@ -1064,6 +1219,7 @@ function App() {
     setGroundOpacity(0.3);
     setShadowQuality("high");
     setAntialiasing(true);
+    setEnableLightBox(false);
   }, []);
 
   const handleModelLoaded = useCallback(() => {
@@ -1119,8 +1275,72 @@ function App() {
 
   return (
     <div className="app-container">
+      {/* Virtual Tour Controls */}
+      {file && cameraPoints.length >= 2 && (
+        <div
+          style={{
+            position: "fixed",
+            left: 28,
+            top: "50%",
+            transform: "translateY(-50%)",
+            zIndex: 25,
+            background: "#181818",
+            border: "1.5px solid #333",
+            borderRadius: 12,
+            padding: "16px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+            minWidth: 180,
+            boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+          }}
+        >
+          <div style={{ color: "#fff", fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
+            Virtual Tour
+          </div>
+          
+          <button
+            style={{
+              padding: "8px 16px",
+              background: tourPlaying ? "#ff4444" : "#4CAF50",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontSize: 13,
+            }}
+            onClick={tourPlaying ? handleStopTour : handleStartTour}
+          >
+            {tourPlaying ? "Stop Tour" : "Start Tour"}
+          </button>
+          
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label style={{ color: "#ccc", fontSize: 12 }}>
+              Speed: {tourSpeed.toFixed(1)}x
+            </label>
+            <input
+              type="range"
+              min="0.5"
+              max="3"
+              step="0.1"
+              value={tourSpeed}
+              onChange={(e) => setTourSpeed(Number(e.target.value))}
+              style={{
+                width: "100%",
+                height: 4,
+                background: "#333",
+                borderRadius: 2,
+                outline: "none",
+                cursor: "pointer",
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Save Camera Point Button at the bottom */}
-      {file && (
+      {file && !is2D && (
         <button
           style={{
             position: "fixed",
@@ -1145,8 +1365,8 @@ function App() {
         </button>
       )}
 
-      {/* Points List at the bottom of the screen (add ball for each point) */}
-      {file && cameraPoints.length > 0 && (
+      {/* Points List at the bottom of the screen */}
+      {file && cameraPoints.length > 0 && !is2D && (
         <div
           style={{
             position: "fixed",
@@ -1173,7 +1393,7 @@ function App() {
           <div style={{ fontWeight: 700, fontSize: 15, marginRight: 12 }}>
             Points:
           </div>
-          {cameraPoints.map((pt) => (
+          {cameraPoints.slice(0, 3).map((pt, index) => (
             <div
               key={pt.id}
               style={{
@@ -1210,11 +1430,188 @@ function App() {
                   border: "1.5px solid #ffb300",
                 }}
               />
-              {pt.name}
+              {index + 1}. {pt.name}
             </div>
           ))}
+          {cameraPoints.length > 3 && (
+            <button
+              style={{
+                padding: "7px 16px",
+                borderRadius: 7,
+                background: "#444",
+                border: "1px solid #555",
+                color: "#fff",
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+              onClick={() => setShowPointsManager(true)}
+            >
+              Manage ({cameraPoints.length})
+            </button>
+          )}
         </div>
       )}
+
+      {/* Points Manager Modal */}
+      {showPointsManager &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100vw",
+              height: "100vh",
+              background: "rgba(0,0,0,0.6)",
+              zIndex: 1000,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            onClick={() => setShowPointsManager(false)}
+          >
+            <div
+              style={{
+                background: "#181818",
+                borderRadius: 14,
+                padding: 32,
+                minWidth: 500,
+                maxWidth: "90vw",
+                maxHeight: "80vh",
+                overflowY: "auto",
+                boxShadow: "0 4px 32px #000a",
+                border: "1.5px solid #333",
+                display: "flex",
+                flexDirection: "column",
+                gap: 18,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ 
+                display: "flex", 
+                justifyContent: "space-between", 
+                alignItems: "center",
+                marginBottom: 16 
+              }}>
+                <div style={{ fontWeight: 700, fontSize: 20, color: "#fff" }}>
+                  Camera Points Manager
+                </div>
+                <button
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#ccc",
+                    fontSize: 24,
+                    cursor: "pointer",
+                    padding: 4,
+                  }}
+                  onClick={() => setShowPointsManager(false)}
+                >
+                  ×
+                </button>
+              </div>
+
+              {cameraPoints.length >= 2 && (
+                <button
+                  style={{
+                    padding: "12px 20px",
+                    background: "#4CAF50",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 8,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    fontSize: 14,
+                    marginBottom: 16,
+                  }}
+                  onClick={() => {
+                    setShowPointsManager(false);
+                    handleStartTour();
+                  }}
+                >
+                  🎬 Create Virtual Tour ({cameraPoints.length} points)
+                </button>
+              )}
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {cameraPoints.map((pt, index) => (
+                  <div
+                    key={pt.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "12px 16px",
+                      background: "#232323",
+                      border: "1px solid #333",
+                      borderRadius: 8,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <span
+                        style={{
+                          display: "inline-block",
+                          width: 20,
+                          height: 20,
+                          borderRadius: "50%",
+                          background: "radial-gradient(circle at 30% 30%, #ffd700 70%, #b8860b 100%)",
+                          boxShadow: "0 0 4px #ffb300",
+                          border: "1.5px solid #ffb300",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: "#000",
+                        }}
+                      >
+                        {index + 1}
+                      </span>
+                      <span style={{ color: "#fff", fontWeight: 600 }}>
+                        {pt.name}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        style={{
+                          padding: "6px 12px",
+                          background: "#444",
+                          color: "#fff",
+                          border: "1px solid #555",
+                          borderRadius: 4,
+                          cursor: "pointer",
+                          fontSize: 12,
+                        }}
+                        onClick={() => {
+                          setShowPointsManager(false);
+                          handleGoToPoint(pt);
+                        }}
+                      >
+                        Go To
+                      </button>
+                      <button
+                        style={{
+                          padding: "6px 12px",
+                          background: "#ff4444",
+                          color: "#fff",
+                          border: "1px solid #ff6666",
+                          borderRadius: 4,
+                          cursor: "pointer",
+                          fontSize: 12,
+                        }}
+                        onClick={() => handleRemovePoint(pt.id)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {/* Save Camera Point Popup */}
       {showSavePopup &&
@@ -1301,6 +1698,12 @@ function App() {
         onResetCamera={handleResetCamera}
         onScreenshot={handleScreenshot}
         onReload={handleReload}
+        is2D={is2D}
+        onToggle2D={handleToggle2D3D}
+        hasModel={!!file}
+        onSavePosition={handleSaveCameraPoint}
+        onTogglePoints={() => setShowPointsManager(true)}
+        savedPointsCount={cameraPoints.length}
       />
 
       <SideMenu
@@ -1346,31 +1749,9 @@ function App() {
         antialiasing={antialiasing}
         setAntialiasing={setAntialiasing}
         onResetSettings={handleResetSettings}
+        enableLightBox={enableLightBox}
+        setEnableLightBox={setEnableLightBox}
       />
-
-      {/* 2D/3D Toggle Button at right bottom */}
-      <button
-        style={{
-          position: "fixed",
-          right: 28,
-          bottom: 28,
-          zIndex: 30,
-          padding: "12px 26px",
-          background: "#232323",
-          color: "#fff",
-          border: "1.5px solid #444",
-          borderRadius: 10,
-          fontWeight: 700,
-          fontSize: 17,
-          cursor: "pointer",
-          opacity: 0.97,
-          boxShadow: "0 2px 12px #000a",
-          transition: "background 0.15s, color 0.15s",
-        }}
-        onClick={handleToggle2D3D}
-      >
-        {is2D ? "Switch to 3D" : "Switch to 2D"}
-      </button>
 
       <main className="main-viewer">
         {file ? (
@@ -1441,7 +1822,7 @@ function App() {
                 castShadow={false}
               />
 
-              {/* Shadow light that follows the camera */}
+              {/* EXTREMELY HUGE Shadow light that follows the camera */}
               <CameraFollowerShadowLight />
 
               <Suspense fallback={<Html center>Loading...</Html>}>
@@ -1459,8 +1840,18 @@ function App() {
                   showGround={showGround}
                   groundOpacity={groundOpacity}
                   cameraPoints={cameraPoints}
+                  enableLightBox={enableLightBox}
                 />
               </Suspense>
+
+              {/* Virtual Tour System */}
+              <VirtualTour
+                cameraPoints={cameraPoints}
+                isPlaying={tourPlaying}
+                speed={tourSpeed}
+                onComplete={handleTourComplete}
+              />
+
               {is2D ? null : (
                 firstPerson ? (
                   <FirstPersonController enabled={true} />
@@ -1564,20 +1955,23 @@ function TopDown2DCamera() {
   );
 }
 
-// Add CameraFollowerShadowLight definition
+// EXTREMELY HUGE Camera Follower Shadow Light
 function CameraFollowerShadowLight() {
   const { camera, scene } = useThree();
   const lightRef = useRef();
 
   useFrame(() => {
     if (lightRef.current && camera) {
-      const offset = new THREE.Vector3(0, 12, -30).applyQuaternion(camera.quaternion);
+      // Position the light much farther from camera for massive coverage
+      const offset = new THREE.Vector3(0, 50, -150).applyQuaternion(camera.quaternion);
       lightRef.current.position.copy(camera.position).add(offset);
+      
       const target = new THREE.Object3D();
       target.position.copy(camera.position).add(
-        new THREE.Vector3(0, 0, -50).applyQuaternion(camera.quaternion)
+        new THREE.Vector3(0, 0, -200).applyQuaternion(camera.quaternion)
       );
       lightRef.current.target.position.copy(target.position);
+      
       if (!scene.children.includes(lightRef.current.target)) {
         scene.add(lightRef.current.target);
       }
@@ -1587,20 +1981,21 @@ function CameraFollowerShadowLight() {
   return (
     <directionalLight
       ref={lightRef}
-      intensity={1.5}
+      intensity={3.5} // Increased intensity
       color="#fffbe0"
       castShadow
-      shadow-mapSize-width={4096}
-      shadow-mapSize-height={4096}
-      shadow-bias={-0.001}
-      shadow-radius={18}
-      shadow-camera-near={0.5}
-      shadow-camera-far={200}
-      shadow-camera-left={-60}
-      shadow-camera-right={60}
-      shadow-camera-top={60}
-      shadow-camera-bottom={-60}
+      shadow-mapSize-width={8192} // Increased shadow map size
+      shadow-mapSize-height={8192}
+      shadow-bias={-0.0001}
+      shadow-radius={25} // Increased shadow radius
+      shadow-camera-near={1}
+      shadow-camera-far={1000} // Massive far distance
+      shadow-camera-left={-500} // HUGE shadow camera bounds
+      shadow-camera-right={500}
+      shadow-camera-top={500}
+      shadow-camera-bottom={-500}
     />
   );
 }
+
 export default App;
