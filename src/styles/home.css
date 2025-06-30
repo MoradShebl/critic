@@ -96,6 +96,7 @@ section {
 
 a {
   transition: color 0.3s ease-in-out;
+  cursor: pointer;
 }
 
 a:hover {
@@ -299,5 +300,11 @@ header aside .header-btns .button {
   .main-video-div {
     width: 100%;
     border: 5px solid var(--secondary-color);
+  }
+}
+
+@media (min-width: 1000px){
+  aside{
+    pointer-events: none;
   }
 }
