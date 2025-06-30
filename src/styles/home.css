@@ -282,6 +282,9 @@ header aside .header-btns .button {
   .main-header .header-btns {
     display: none;
   }
+  .main-header .right{
+    gap: 20px;
+  }
   .hamburger-menu {
     display: flex;
   }
@@ -294,6 +297,7 @@ header aside .header-btns .button {
     width: 100%;
   }
   .main-video-div {
-    width: 95%;
+    width: 100%;
+    border: 5px solid var(--secondary-color);
   }
 }
