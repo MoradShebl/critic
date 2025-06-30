@@ -204,18 +204,17 @@ function Home() {
           ref={asideRef}
           style={{
             opacity: 0,
-            pointerEvents: "none",
             zIndex: 1100,
           }}
         >
           <nav>
-            <a>Features</a>
-            <a>Pricing</a>
-            <a>How it works</a>
+            <a onClick={toggleMenu}>Features</a>
+            <a onClick={toggleMenu}>Pricing</a>
+            <a onClick={toggleMenu}>How it works</a>
           </nav>
           <div className="header-btns">
-            <a className="button">Join The Waitlist</a>
-            <Link to="/3d" className="button reversed">
+            <a onClick={toggleMenu} className="button">Join The Waitlist</a>
+            <Link onClick={toggleMenu} to="/3d" className="button reversed">
               Give it a try (Beta)
             </Link>
           </div>
