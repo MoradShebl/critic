@@ -131,7 +131,7 @@ function Home() {
               </svg>
             </button>
             <div className="logo">
-              <img src="public\Favicon.png" alt="Logo" />
+              <img src="src\assets\Favicon.png" alt="Logo" />
               <span>Critic</span>
             </div>
             <nav>
