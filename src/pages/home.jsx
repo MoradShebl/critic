@@ -35,7 +35,6 @@ function Home() {
       ".features-section",
       ".pricing-section",
       ".waitlist-section",
-      "footer",
     ];
     const elements = selectors
       .map((selector) => Array.from(document.querySelectorAll(selector)))
@@ -73,15 +72,6 @@ function Home() {
     if (featureVideo) {
       featureVideo.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const form = e.target;
-    const email = form.email.value.trim();
-    if (!email) return;
-    window.location.href = `mailto:moradsheblmohamed@gmail.com?subject=Waitlist%20Signup&body=Please%20add%20this%20email%20to%20the%20waitlist:%20${encodeURIComponent(email)}`;
-    form.reset();
   };
 
   return (
@@ -235,8 +225,18 @@ function Home() {
         />
         <h2>Be the first to Make happier clients</h2>
         <span>Join hundreds of users waiting for the biggest release</span>
-        <form onSubmit={(e) => handleSubmit(e)} className="wailist-container">
-          <input placeholder="Email" required type="email" name="email" />
+        <form
+          action="https://docs.google.com/forms/d/e/1FAIpQLScRBCKILgNvUq_kP6BN61PqT9Lf57G7iByhSYwVhY55qGrYSw/formResponse"
+          method="POST"
+          target="_blank"
+          className="wailist-container"
+        >
+          <input
+            placeholder="Email"
+            required
+            type="email"
+            name="entry.2042512401"
+          />
           <button className="button" type="submit">
             Join The Waitlist ➔
           </button>

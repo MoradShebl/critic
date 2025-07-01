@@ -41,6 +41,7 @@ section {
   width: 100%;
   padding: 20px;
   min-height: 50vh;
+  overflow-x: none;
 }
 
 section h2 {
