@@ -83,7 +83,7 @@ function Header() {
                 <line x1="3" y1="18" x2="21" y2="18"></line>
               </svg>
             </button>
-            <div className="logo">
+            <div className="logo" onClick={() => window.location.reload()}>
               <svg
                 version="1.1"
                 xmlns="http://www.w3.org/2000/svg"
@@ -141,8 +141,26 @@ function Header() {
               <span>Critic</span>
             </div>
             <nav>
-              <a>Features</a>
-              <a>Pricing</a>
+              <a
+                onClick={(e) => {
+                  e.preventDefault();
+                  const el = document.getElementById("features");
+                  if (el)
+                    el.scrollIntoView({ behavior: "smooth", block: "center" });
+                }}
+              >
+                Features
+              </a>
+              <a
+                onClick={(e) => {
+                  e.preventDefault();
+                  const el = document.getElementById("pricing");
+                  if (el)
+                    el.scrollIntoView({ behavior: "smooth", block: "center" });
+                }}
+              >
+                Pricing
+              </a>
               <a>How it works</a>
             </nav>
           </div>

@@ -19,6 +19,8 @@ body {
 a {
   transition: color 0.3s ease-in-out;
   cursor: pointer;
+  text-decoration: none;
+  color: var(--primary-color);
 }
 
 a:hover {
@@ -173,6 +175,7 @@ header {
   display: flex;
   align-items: center;
   gap: 10px;
+  cursor: pointer;
 }
 
 .main-header .logo svg {
@@ -346,6 +349,58 @@ header aside .header-btns .button {
   border-top: var(--forth-color) 1px solid;
 }
 
+.pricing-content {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: center;
+  flex-wrap: nowrap;
+  overflow-x: scroll;
+  gap: 20px;
+}
+
+.princing-card {
+  background-color: #fefefe;
+  border: var(--m-forth-color) 1px solid;
+  border-radius: 20px;
+  padding: 20px;
+  width: 100%;
+  max-width: 300px;
+  box-shadow: 0px 20px 126px -49px rgba(0, 0, 0, 0.1);
+  min-width: 300px;
+}
+
+.princing-card.king {
+  border: var(--secondary-color-color) 2px solid;
+}
+
+.princing-card.king::before {
+  content: "✰ The Best Value ✰";
+  display: flex;
+  justify-content: center;
+  width: 90%;
+  background-color: var(--secondary-color-color);
+  color: var(--primary-color);
+  padding: 5px 10px;
+  border-radius: 10px;
+}
+
+.price-and-button {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.princing-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.princing-card li::marker {
+  content: "🗸 ";
+}
+
 @media (max-width: 1000px) {
   .notice-board {
     flex-direction: column;
@@ -388,6 +443,9 @@ header aside .header-btns .button {
   .feature-list {
     flex-direction: column;
     align-items: center;
+  }
+  .princing-card {
+    min-width: 200px;
   }
 }
 
