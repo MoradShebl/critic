@@ -1,7 +1,7 @@
 :root {
   --primary-color: #f8f9fa;
   --secondary-color: #000000;
-  --third-color: #222222;
+  --secondary-color-color: #222222;
   --forth-color: #555555;
 
   --m-primary-color: #000000;
@@ -16,17 +16,42 @@ body {
   overflow-y: scroll;
 }
 
+a {
+  transition: color 0.3s ease-in-out;
+  cursor: pointer;
+}
+
+a:hover {
+  color: var(--m-third-color);
+}
+
 section {
   width: 100%;
   padding: 20px;
   min-height: 50vh;
 }
 
+section h2 {
+  font-size: 2em;
+  text-align: center;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: var(--secondary-color);
+}
+
+h2::first-letter {
+  font-size: 1.1em;
+  font-weight: 800;
+}
+
 .button {
-  background-image: linear-gradient(var(--forth-color), var(--third-color));
+  background-image: linear-gradient(
+    var(--forth-color),
+    var(--secondary-color-color)
+  );
   background-size: 100% 200%;
   background-position: top;
-  border: 1px solid var(--third-color);
+  border: 1px solid var(--secondary-color-color);
   border-radius: 4px;
   box-sizing: border-box;
   color: var(--primary-color);
@@ -92,15 +117,6 @@ section {
 
 .button.reversed:focus {
   box-shadow: rgba(82, 82, 82, 0.5) 0 0 0 3px;
-}
-
-a {
-  transition: color 0.3s ease-in-out;
-  cursor: pointer;
-}
-
-a:hover {
-  color: var(--m-third-color);
 }
 
 .notice-board {
@@ -267,6 +283,69 @@ header aside .header-btns .button {
   border: none;
 }
 
+.features-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.feature-video {
+  position: relative;
+  background-color: var(--secondary-color);
+  overflow: hidden;
+  width: 90%;
+  border-radius: 20px;
+  border: 10px solid var(--secondary-color);
+  aspect-ratio: 16 / 9;
+}
+
+.feature-video iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.feature-video iframe::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: transparent;
+}
+
+.feature-list {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 0px 6% 0px 6%;
+  width: 100%;
+  margin-top: 20px;
+}
+
+.feature-item {
+  cursor: pointer;
+  transition: all 0.3s ease-in-out;
+  width: 100%;
+  padding: 20px;
+  border-top: var(--secondary-color) 2px solid;
+}
+
+.feature-item:hover {
+  translate: 0px -3px;
+  color: var(--forth-color);
+  border-top: var(--forth-color) 2px solid;
+}
+
+.feature-item.checked {
+  translate: 0px -3px;
+  color: var(--forth-color);
+  border-top: var(--forth-color) 1px solid;
+}
+
 @media (max-width: 1000px) {
   .notice-board {
     flex-direction: column;
@@ -283,7 +362,7 @@ header aside .header-btns .button {
   .main-header .header-btns {
     display: none;
   }
-  .main-header .right{
+  .main-header .right {
     gap: 20px;
   }
   .hamburger-menu {
@@ -301,10 +380,19 @@ header aside .header-btns .button {
     width: 100%;
     border: 5px solid var(--secondary-color);
   }
+
+  .feature-video {
+    width: 100%;
+    border: 5px solid var(--secondary-color);
+  }
+  .feature-list {
+    flex-direction: column;
+    align-items: center;
+  }
 }
 
-@media (min-width: 1000px){
-  aside{
+@media (min-width: 1000px) {
+  aside {
     pointer-events: none;
   }
 }

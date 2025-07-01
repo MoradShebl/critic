@@ -1,0 +1,30 @@
+[
+    {
+        "features": [
+            {
+                "id": 1,
+                "name": "Walk mode",
+                "desciption": "Walk mode allows you to navigate through the model at a slower pace, giving you time to appreciate the scenery and details.",
+                "video": "EaH0fMakP48"
+            },
+            {
+                "id": 2,
+                "name": "Camera points",
+                "desciption": "Allow to save camera points that allow to navigate throught saved places faster (eg: kitchen, living room, etc.).",
+                "video": "U2PjMYdt4jI"
+            },
+            {
+                "id": 3,
+                "name": "Virtual tour",
+                "desciption": "Virtual tour allows you to take a guided tour through the model, with a points that Camera Saved.",
+                "video": "zuG4CDgKubs"
+            },
+            {
+                "id": 4,
+                "name": "Toggle between 2D and 3D",
+                "desciption": "Toggle between 2D and 3D allows you to switch between a 2D floor plan view and a 3D model view, giving you different perspectives of the space.",
+                "video": "mBvFMYRZVTU"
+            }
+        ]
+    }
+]

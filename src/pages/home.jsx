@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Header from "../components/HomePage/Header";
@@ -7,41 +7,57 @@ import "../styles/home.css";
 
 gsap.registerPlugin(ScrollTrigger);
 
+async function fetchDataJson() {
+  const response = await fetch("/data.json");
+  if (!response.ok) throw new Error("Failed to fetch data.json");
+  return response.json();
+}
+
 function Home() {
+  const [features, setFeatures] = useState([]);
+  const [videoId, setVideoId] = useState("EaH0fMakP48");
 
   useEffect(() => {
-    const selectors = [".hero-section", ".features", ".pricing", "footer"];
+    fetchDataJson()
+      .then((data) => {
+        if (Array.isArray(data) && data[0]?.features) {
+          setFeatures(data[0].features);
+        }
+      })
+      .catch((e) => {
+        setFeatures([]);
+      });
+  }, []);
+
+  useEffect(() => {
+    const selectors = [
+      ".hero-section",
+      ".features-section",
+      ".pricing-section",
+      "footer",
+    ];
     const elements = selectors
-      .map((selector) => document.querySelector(selector))
+      .map((selector) => Array.from(document.querySelectorAll(selector)))
+      .flat()
       .filter(Boolean);
 
     if (elements.length) {
-      const tl = gsap.timeline({
-        defaults: {
+      elements.forEach((el, i) => {
+        gsap.set(el, { filter: "blur(12px)", opacity: 0, scale: 1.05, y: 24 });
+        gsap.to(el, {
           filter: "blur(0px)",
           opacity: 1,
+          scale: 1,
           y: 0,
-          duration: 1,
-          ease: "power1.out",
-        },
-      });
-
-      elements.forEach((el, i) => {
-        gsap.set(el, { filter: "blur(6px)", opacity: 0, y: 16 });
-        tl.to(
-          el,
-          {
-            filter: "blur(0px)",
-            opacity: 1,
-            y: 0,
-            scrollTrigger: {
-              trigger: el,
-              start: "top 85%",
-              toggleActions: "play none none none",
-            },
+          duration: 1.1,
+          ease: "power2.out",
+          scrollTrigger: {
+            trigger: el,
+            start: "top 85%",
+            toggleActions: "play none none none",
           },
-          i * 0.08
-        );
+          delay: i * 0.1,
+        });
       });
     }
 
@@ -49,6 +65,10 @@ function Home() {
       ScrollTrigger.getAll().forEach((trigger) => trigger.kill());
     };
   }, []);
+
+  const changeVideoId = (videoId) => {
+    setVideoId(videoId);
+  };
 
   return (
     <>
@@ -91,10 +111,43 @@ function Home() {
           ></iframe>
         </div>
       </section>
-      <section className="features" id="features"></section>
-      <section className="pricing" id="pricing">
+      <section className="features-section" id="features">
+        <h2>
+          A better way to critique starts with understanding <br />
+          before judging.
+        </h2>
+        <div className="feature-video">
+          <iframe
+            src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&loop=1&disablekb=1&playsinline=1&rel=0&vq=small&playlist=${videoId}`}
+            title=""
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen={false}
+          />
+        </div>
+        <div className="feature-list">
+          {features.length > 0 ? (
+            features.map((feature) => (
+              <div
+                className={`feature-item${
+                  videoId === feature.video ? " checked" : ""
+                }`}
+                key={feature.id}
+                onClick={() => changeVideoId(feature.video)}
+              >
+                <h3>{feature.name}</h3>
+                <p>{feature.desciption}</p>
+              </div>
+            ))
+          ) : (
+            <div>Loading features...</div>
+          )}
+        </div>
+      </section>
+      <section
+        className="pricing-section"
+        id="pricing"
+      >
         <h2>Pricing</h2>
-        <div></div>
       </section>
       <footer></footer>
     </>
