@@ -17,6 +17,15 @@ body {
   overflow-x: hidden;
 }
 
+input {
+  background-color: var(--primary-color);
+  color: var(--secondary-color);
+  border: 1px solid var(--secondary-color-color);
+  border-radius: 4px;
+  padding: 10px;
+  font-size: 16px;
+}
+
 a {
   transition: color 0.3s ease-in-out;
   cursor: pointer;
@@ -172,18 +181,19 @@ header {
   font-size: 1em;
 }
 
-.main-header .logo {
+.logo {
   display: flex;
   align-items: center;
   gap: 10px;
   cursor: pointer;
+  color: var(--primary-color);
 }
 
-.main-header .logo svg {
+.logo svg {
   width: 40px;
 }
 
-.main-header .logo span {
+.logo span {
   font-size: 24px;
   font-weight: 600;
 }
@@ -394,12 +404,66 @@ header aside .header-btns .button {
 }
 .princing-card ul {
   list-style: none;
-  padding: 0;
+  padding: 10px;
   margin: 0;
 }
 
 .princing-card li::marker {
   content: "🗸 ";
+}
+
+.waitlist-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.wailist-container {
+  padding: 20px;
+  display: flex;
+  flex-direction: row;
+  gap: 5px;
+  background-color: #ffffff;
+  border-radius: 10px;
+  margin-top: 10px;
+  box-shadow: 5px 5px 10px 10px rgba(0, 0, 0, 0.1);
+}
+
+.waitlist-section span {
+  text-align: center;
+}
+
+footer{
+  width: 100%;
+  padding: 20px;
+  background-color: var(--secondary-color);
+  color: var(--primary-color);
+  text-align: center;
+  font-size: 0.9em;
+}
+
+.footer-logo span{
+  font-size: 10em;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.footer-btns{
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.footer-hyperlinks nav{
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 10px;
 }
 
 @media (max-width: 1000px) {
@@ -448,10 +512,28 @@ header aside .header-btns .button {
   .princing-card {
     min-width: 200px;
   }
+  .wailist-container {
+    flex-direction: column;
+    width: 90%;
+  }
+  .footer-logo span{
+    font-size: 5em;
+  }
+  .footer-btns {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .footer-btns .button {
+    width: 100%;
+  }
 }
 
 @media (min-width: 1000px) {
   aside {
     pointer-events: none;
+  }
+  .pricing-content::-webkit-scrollbar {
+    display: none;
   }
 }

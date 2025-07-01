@@ -55,7 +55,16 @@ function Header() {
     <>
       <div className="notice-board">
         Don't forget to join the Waitlist!{" "}
-        <a className="button reversed">Join The Waitlist</a>
+        <a
+          className="button reversed"
+          onClick={(e) => {
+            e.preventDefault();
+            const el = document.getElementById("waitlist");
+            if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+          }}
+        >
+          Join The Waitlist
+        </a>
       </div>
       <header>
         <div className="main-header">
@@ -161,11 +170,20 @@ function Header() {
               >
                 Pricing
               </a>
-              <a>How it works</a>
             </nav>
           </div>
           <div className="header-btns">
-            <a className="button">Join The Waitlist</a>
+            <a
+              className="button"
+              onClick={(e) => {
+                e.preventDefault();
+                const el = document.getElementById("waitlist");
+                if (el)
+                  el.scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+            >
+              Join The Waitlist
+            </a>
             <Link to="/3d" className="button reversed">
               Give it a try (Beta)
             </Link>
@@ -179,15 +197,53 @@ function Header() {
           }}
         >
           <nav>
-            <a onClick={toggleMenu}>Features</a>
-            <a onClick={toggleMenu}>Pricing</a>
-            <a onClick={toggleMenu}>How it works</a>
+            <a
+              onClick={(e) => {
+                e.preventDefault();
+                const el = document.getElementById("features");
+                if (el)
+                  el.scrollIntoView({ behavior: "smooth", block: "center" });
+                toggleMenu();
+              }}
+            >
+              Features
+            </a>
+            <a
+              onClick={(e) => {
+                e.preventDefault();
+                const el = document.getElementById("pricing");
+                if (el)
+                  el.scrollIntoView({ behavior: "smooth", block: "center" });
+                toggleMenu();
+              }}
+            >
+              Pricing
+            </a>
           </nav>
           <div className="header-btns">
-            <a onClick={toggleMenu} className="button">
+            <a
+              className="button"
+              onClick={(e) => {
+                toggleMenu();
+                e.preventDefault();
+                const el = document.getElementById("waitlist");
+                if (el)
+                  el.scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+            >
               Join The Waitlist
             </a>
-            <Link onClick={toggleMenu} to="/3d" className="button reversed">
+            <Link
+              onClick={(e) => {
+                toggleMenu();
+                e.preventDefault();
+                const el = document.getElementById("waitlist");
+                if (el)
+                  el.scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+              to="/3d"
+              className="button reversed"
+            >
               Give it a try (Beta)
             </Link>
           </div>

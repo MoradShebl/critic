@@ -34,6 +34,7 @@ function Home() {
       ".hero-section",
       ".features-section",
       ".pricing-section",
+      ".waitlist-section",
       "footer",
     ];
     const elements = selectors
@@ -74,6 +75,15 @@ function Home() {
     }
   };
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const email = form.email.value.trim();
+    if (!email) return;
+    window.location.href = `mailto:moradsheblmohamed@gmail.com?subject=Waitlist%20Signup&body=Please%20add%20this%20email%20to%20the%20waitlist:%20${encodeURIComponent(email)}`;
+    form.reset();
+  };
+
   return (
     <>
       <Header />
@@ -102,7 +112,17 @@ function Home() {
           </p>
         </div>
         <div className="hero-btns">
-          <a className="button">Join The Waitlist</a>
+          <a
+            className="button"
+            onClick={(e) => {
+              e.preventDefault();
+              const el = document.getElementById("waitlist");
+              if (el)
+                el.scrollIntoView({ behavior: "smooth", block: "center" });
+            }}
+          >
+            Join The Waitlist
+          </a>
           <Link to="/3d" className="button reversed">
             Give it a try (Beta)
           </Link>
@@ -198,7 +218,91 @@ function Home() {
           </div>
         </div>
       </section>
-      <footer></footer>
+      <section className="waitlist-section" id="waitlist">
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: -10,
+            height: "100%",
+            width: "100%",
+            backgroundImage: `
+      linear-gradient(to right, #f0f0f0 1px, transparent 1px),
+      linear-gradient(to bottom, #f0f0f0 1px, transparent 1px)
+    `,
+            backgroundSize: "6rem 4rem",
+          }}
+        />
+        <h2>Be the first to Make happier clients</h2>
+        <span>Join hundreds of users waiting for the biggest release</span>
+        <form onSubmit={(e) => handleSubmit(e)} className="wailist-container">
+          <input placeholder="Email" required type="email" name="email" />
+          <button className="button" type="submit">
+            Join The Waitlist ➔
+          </button>
+        </form>
+      </section>
+      <footer>
+        <div className="footer-content">
+          <div className="footer-logo" onClick={() => window.location.reload()}>
+            <span>Critic</span>
+          </div>
+          <div className="footer-links">
+            <div className="footer-hyperlinks">
+              <nav>
+                <a
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const el = document.getElementById("features");
+                    if (el)
+                      el.scrollIntoView({
+                        behavior: "smooth",
+                        block: "center",
+                      });
+                  }}
+                  href="#features"
+                >
+                  Features
+                </a>
+                <a
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const el = document.getElementById("pricing");
+                    if (el)
+                      el.scrollIntoView({
+                        behavior: "smooth",
+                        block: "center",
+                      });
+                  }}
+                  href="#pricing"
+                >
+                  Pricing
+                </a>
+              </nav>
+            </div>
+          </div>
+          <div className="footer-btns">
+            <a
+              className="button"
+              onClick={(e) => {
+                toggleMenu();
+                e.preventDefault();
+                const el = document.getElementById("waitlist");
+                if (el)
+                  el.scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+            >
+              Join The Waitlist
+            </a>
+            <Link to="/3d" className="button reversed">
+              Give it a try (Beta)
+            </Link>
+          </div>
+        </div>
+        <div className="footer-copyright">
+          © {new Date().getFullYear()} Critic. All rights reserved.
+        </div>
+      </footer>
     </>
   );
 }
