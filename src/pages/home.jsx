@@ -224,7 +224,7 @@ function Home() {
           }}
         />
         <h2>Be the first to Make happier clients</h2>
-        <span>Join hundreds of users waiting for the biggest release</span>
+        <span>Join hundreds of users already joined </span>
         <form
           action="https://docs.google.com/forms/d/e/1FAIpQLScRBCKILgNvUq_kP6BN61PqT9Lf57G7iByhSYwVhY55qGrYSw/formResponse"
           method="POST"
