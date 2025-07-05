@@ -54,7 +54,7 @@ function Header() {
   return (
     <>
       <div className="notice-board">
-        Don't forget to join the Waitlist!{" "}
+        Don't forget to join the Newsletter!{" "}
         <a
           className="button reversed"
           onClick={(e) => {
@@ -63,7 +63,7 @@ function Header() {
             if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
           }}
         >
-          Join The Waitlist
+          Join The Newsletter
         </a>
       </div>
       <header>
@@ -147,7 +147,7 @@ function Header() {
                   ></polygon>
                 </g>
               </svg>
-              <span>Critic</span>
+              <span className="logo-text">Critic</span>
             </div>
             <nav>
               <a
@@ -182,7 +182,7 @@ function Header() {
                   el.scrollIntoView({ behavior: "smooth", block: "center" });
               }}
             >
-              Join The Waitlist
+              Join The Newsletter
             </a>
             <Link to="/3d" className="button reversed">
               Give it a try (Beta)
@@ -231,7 +231,7 @@ function Header() {
                   el.scrollIntoView({ behavior: "smooth", block: "center" });
               }}
             >
-              Join The Waitlist
+              Join The Newsletter
             </a>
             <Link
               onClick={(e) => {

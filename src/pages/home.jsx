@@ -111,7 +111,7 @@ function Home() {
                 el.scrollIntoView({ behavior: "smooth", block: "center" });
             }}
           >
-            Join The Waitlist
+            Join The Newsletter
           </a>
           <Link to="/3d" className="button reversed">
             Give it a try (Beta)
@@ -238,7 +238,7 @@ function Home() {
             name="entry.2042512401"
           />
           <button className="button" type="submit">
-            Join The Waitlist ➔
+            Join The Newsletter ➔
           </button>
         </form>
       </section>
@@ -292,7 +292,7 @@ function Home() {
                   el.scrollIntoView({ behavior: "smooth", block: "center" });
               }}
             >
-              Join The Waitlist
+              Join The Newsletter
             </a>
             <Link to="/3d" className="button reversed">
               Give it a try (Beta)
