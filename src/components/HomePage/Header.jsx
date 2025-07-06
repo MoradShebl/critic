@@ -185,7 +185,7 @@ function Header() {
               Join The Newsletter
             </a>
             <Link to="/3d" className="button reversed">
-              Give it a try (Beta)
+              Give it a try
             </Link>
           </div>
         </div>
@@ -244,7 +244,7 @@ function Header() {
               to="/3d"
               className="button reversed"
             >
-              Give it a try (Beta)
+              Give it a try
             </Link>
           </div>
         </aside>

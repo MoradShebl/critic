@@ -114,7 +114,7 @@ function Home() {
             Join The Newsletter
           </a>
           <Link to="/3d" className="button reversed">
-            Give it a try (Beta)
+            Give it a try
           </Link>
         </div>
         <div className="main-video-div">
@@ -192,7 +192,7 @@ function Home() {
             <div className="price-and-button">
               <span>0$ Unlimited members</span>
               <Link to="/3d" className="button reversed">
-                Give it a try (Beta)
+                Give it a try
               </Link>
             </div>
             <span>What's included:</span>
@@ -295,7 +295,7 @@ function Home() {
               Join The Newsletter
             </a>
             <Link to="/3d" className="button reversed">
-              Give it a try (Beta)
+              Give it a try
             </Link>
           </div>
         </div>
