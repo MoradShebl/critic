@@ -119,6 +119,7 @@ function Home() {
         </div>
         <div className="main-video-div">
           <iframe
+            title="Critic"
             src="https://www.youtube.com/embed/rVu_WghPUvg?autoplay=1&mute=1&controls=1&loop=true&playlist=rVu_WghPUvg"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
