@@ -134,7 +134,7 @@ function Home() {
         <div className="feature-video" id="feature-video">
           <iframe
             src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&loop=1&disablekb=1&playsinline=1&rel=0&vq=small&playlist=${videoId}`}
-            title=""
+            title="Main video"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen={false}
           />
